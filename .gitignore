@@ -1,0 +1,49 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+.secrets/
+*.secret
+.tool-versions
+
+# Node/Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/
+/frontend/.cache/
+/frontend/.rspack/
+/frontend/.swc/
+/frontend/.eslintcache
+/frontend/.stylelintcache
+/frontend/*.tsbuildinfo
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/frontend/pnpm-debug.log*
+
+# Clojure/Backend
+/backend/target/
+/backend/.cpcache/
+/backend/.nrepl-port
+/backend/.repl-history
+# Tooling caches
+/.clj-kondo/.cache/
+/.lsp/
+/backend/.lsp/
+/backend/.clj-kondo/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Test output
+/coverage/
+/tmp/
