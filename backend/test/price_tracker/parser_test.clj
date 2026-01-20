@@ -1,6 +1,11 @@
 (ns price-tracker.parser-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
             [price-tracker.parser :as parser]))
+
+(defn- load-fixture
+  [filename]
+  (slurp (io/resource (str "fixtures/" filename))))
 
 (deftest resolve-parser-prefers-exact-then-suffix
   (let [registry {:exact {"shop.example.com" {:name "exact"}}
@@ -36,3 +41,21 @@
         result (parser/parse-product parser/default-registry "example.com" html)]
     (is (= 42.00M (:price result)))
     (is (= "regex" (:parser-source result)))))
+
+(deftest parse-product-amazon-dom
+  (let [html (load-fixture "amazon-product.html")
+        result (parser/parse-product parser/default-registry "www.amazon.com" html)]
+    (is (= "Sample Amazon Item" (:title result)))
+    (is (= 129.00M (:price result)))
+    (is (= "USD" (:currency result)))
+    (is (= "dom" (:parser-source result)))
+    (is (= "amazon-v1" (:parser-version result)))))
+
+(deftest parse-product-lululemon-dom
+  (let [html (load-fixture "lululemon-product.html")
+        result (parser/parse-product parser/default-registry "shop.lululemon.com" html)]
+    (is (= "Align High-Rise Pant" (:title result)))
+    (is (= 98.00M (:price result)))
+    (is (= "CAD" (:currency result)))
+    (is (= "dom" (:parser-source result)))
+    (is (= "lululemon-v1" (:parser-version result)))))

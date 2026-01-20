@@ -20,7 +20,31 @@
 
 (def default-registry
   {:exact {}
-   :suffix {}
+   :suffix {"amazon.com" {:name "amazon"
+                          :parser-version "amazon-v1"
+                          :title-selectors ["#productTitle"
+                                            "h1#title span#productTitle"
+                                            "meta[name=title]"]
+                          :price-selectors ["#priceblock_ourprice"
+                                            "#priceblock_dealprice"
+                                            "span.a-price span.a-offscreen"
+                                            "meta[property=product:price:amount]"]}
+            "amazon.ca" {:name "amazon"
+                         :parser-version "amazon-v1"
+                         :title-selectors ["#productTitle"
+                                           "h1#title span#productTitle"
+                                           "meta[name=title]"]
+                         :price-selectors ["#priceblock_ourprice"
+                                           "#priceblock_dealprice"
+                                           "span.a-price span.a-offscreen"
+                                           "meta[property=product:price:amount]"]}
+            "lululemon.com" {:name "lululemon"
+                             :parser-version "lululemon-v1"
+                             :title-selectors ["h1[data-testid=pdp-product-name]"
+                                               "h1"]
+                             :price-selectors ["span[data-testid=pdp-price]"
+                                               "div[data-testid=pdp-price]"
+                                               "meta[property=product:price:amount]"]}}
    :default {:name "generic"
              :parser-version "v1"
              :title-selectors []
