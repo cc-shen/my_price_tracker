@@ -1,5 +1,10 @@
 # Architecture Notes
 
+## Deployment model
+- Local-only on a Macbook; services bind to localhost by default
+- No public ingress or internet-exposed ports required
+- Do not open firewall rules, port-forwarding, or public tunnels
+
 ## Persistence choice
 - Database: PostgreSQL 16
 - Rationale: strong relational model, time-series friendly indexing, standard Docker support

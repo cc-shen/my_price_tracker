@@ -3,6 +3,18 @@
 ## Overview
 This repository uses a React + TypeScript + Tailwind CSS frontend bundled with rspack, and a Clojure backend. Database usage is intentionally undecided; keep persistence optional and document any choice before introducing a dependency.
 
+## Always-Read Docs
+- Before starting any task in this repo, review `REQUIREMENTS.md` and `PLAN.md` for scope, constraints, and current milestones.
+- Keep changes aligned with the requirements (functional + non-functional) and the milestone plan.
+
+## Requirements & Plan Highlights
+- Core MVP: add product by URL, dashboard list, product detail with price history chart + range presets, delete with confirmation, manual refresh.
+- Security is mandatory: SSRF protections, input validation, rate limiting, safe logging, and SQL injection protection.
+- Deployment is local-only (run on a Macbook), with no public exposure of services.
+- Persistence: recommended Postgres with migrations and cascade deletes; document final choice before adding a dependency.
+- Deployment: Docker/Podman with separate frontend/backend/DB containers and persistent volumes.
+- Parsing: domain-based parser registry with DOM → JSON-LD → OpenGraph → regex fallback.
+
 ## Project Structure & Module Organization
 - `frontend/`: React app (e.g., `frontend/src/`, `frontend/public/`).
 - `frontend/src/`: UI modules by feature (e.g., `frontend/src/pricing/`).

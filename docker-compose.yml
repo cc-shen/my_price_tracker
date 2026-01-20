@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://price_tracker:price_tracker@db:5432/price_tracker
+      PORT: "8080"
+      LOG_LEVEL: info
+      FETCH_TIMEOUT_MS: "8000"
+      RATE_LIMIT_PER_MINUTE: "60"
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: http://127.0.0.1:8080
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: price_tracker
+      POSTGRES_USER: price_tracker
+      POSTGRES_PASSWORD: price_tracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+volumes:
+  pgdata:

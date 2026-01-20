@@ -1,5 +1,7 @@
 # Price Tracker
 
+Local-only app intended to run on a Macbook; no public deployment target.
+
 ## Make targets
 ```sh
 make frontend-dev

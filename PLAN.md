@@ -2,6 +2,7 @@
 
 ## Milestone 0: Repo baseline & decisions
 - Verify repo structure (`frontend/`, `backend/`, `docs/`, `scripts/`).
+- Document local-only deployment requirement (localhost binding, no public exposure).
 - Decide and document persistence choice (default: PostgreSQL as suggested in requirements).
 - Add/extend `docs/architecture.md` with DB choice, migration tool, and rationale.
 - Add `.env.example` with backend/frontend variables from requirements.
@@ -10,7 +11,7 @@
 ### 1.1 Service skeleton
 - Create Ring + Reitit app with Integrant/Mount lifecycle.
 - Add config loading from env vars (`DATABASE_URL`, `PORT`, etc.).
-- Add basic health endpoint and CORS (if needed for local dev).
+- Add basic health endpoint and CORS (if needed for local dev only).
 
 ### 1.2 Database schema + migrations
 - Add migration tooling (Migratus or Flyway) and baseline migration.
@@ -89,7 +90,7 @@
 ## Milestone 7: Containerization & docs
 - Add `docker-compose.yml` with frontend, backend, Postgres, and volumes.
 - Document local dev commands and env setup in README or `docs/`.
-- Confirm persistence survives container restarts.
+- Bind services to localhost only and confirm persistence survives container restarts.
 
 ## Milestone 8: Post-MVP enhancements
 - Scheduler for periodic refresh + rate limiting.

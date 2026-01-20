@@ -5,6 +5,10 @@
 ### 1.1 Purpose
 Build a web application that allows a user to **track product prices across multiple retail websites** by submitting product links. The app collects and stores each product’s price over time and displays **price history graphs** with filtering options.
 
+### 1.1.1 Local-only deployment requirement
+This application is intended to run **locally on a Macbook** and is **not meant to be publicly exposed**. Services should bind to localhost by default and avoid public internet ingress.
+Do not open firewall rules, port-forwarding, or public tunnels for this app.
+
 ### 1.2 Goals
 - Track products from multiple websites (Amazon, Lululemon, Aritzia, Jimmy Choo, etc.).
 - Automatically fetch:
@@ -18,6 +22,7 @@ Build a web application that allows a user to **track product prices across mult
   - Add product by URL
   - Delete product (with confirmation)
 - Deployable via **Docker/Podman** with reliable persistence
+- Local-only operation; no public hosting requirement
 
 ### 1.3 Non-Goals (for initial version)
 - Price drop alerts (email/push)
@@ -25,6 +30,7 @@ Build a web application that allows a user to **track product prices across mult
 - Browser extension integration
 - Full internationalization (multi-language)
 - Complex anti-bot bypass / CAPTCHA solving
+- Public hosting or internet-exposed services
 
 
 ## 2) Users & Use Cases
@@ -199,7 +205,7 @@ Build a web application that allows a user to **track product prices across mult
 - Secure headers:
   - Content Security Policy (CSP)
   - X-Frame-Options / frame-ancestors
-  - Strict-Transport-Security (if deployed publicly)
+  - Strict-Transport-Security (only if ever deployed publicly)
 - Backend secrets:
   - Stored only in environment variables (no hardcoding)
 - Rate limiting:
@@ -368,6 +374,7 @@ Some sites will block automated requests.
 - One container for frontend
 - One container for PostgreSQL
 - Compose file for local dev: `docker-compose.yml` (or Podman equivalent)
+- Bind services to localhost only; do not expose public ports by default
 
 ### 8.2 Environment Variables
 Backend:
