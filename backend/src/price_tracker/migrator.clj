@@ -13,3 +13,7 @@
 (defn migrate
   []
   (migratus/migrate (migratus-config)))
+
+(defn -main
+  [& _]
+  (migrate))

@@ -2,6 +2,7 @@
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [price-tracker.api :as api]
+            [price-tracker.rate-limit :as rate-limit]
             [price-tracker.responses :as responses]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -64,6 +65,7 @@
                 (routes ds))]
     (-> (ring/ring-handler router)
         (params/wrap-params)
+        (rate-limit/wrap-rate-limit {:limit-per-minute (get-in config [:fetch :rate-limit-per-minute])})
         (wrap-json-body)
         (wrap-cors-if-needed (:cors config))
         (wrap-exceptions))))

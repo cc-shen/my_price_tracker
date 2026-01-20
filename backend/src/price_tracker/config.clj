@@ -27,5 +27,6 @@
    :logging {:level (env "LOG_LEVEL" "info")}
    :fetch {:timeout-ms (env-int "FETCH_TIMEOUT_MS" 10000)
            :rate-limit-per-minute (env-int "RATE_LIMIT_PER_MINUTE" 60)
-           :allowed-domains (parse-origins (env "ALLOWED_DOMAINS" nil))}
+           :allowed-domains (parse-origins (env "ALLOWED_DOMAINS" nil))
+           :user-agent (env "FETCH_USER_AGENT" nil)}
    :cors {:allowed-origins (parse-origins (env "CORS_ALLOWED_ORIGINS" nil))}})
