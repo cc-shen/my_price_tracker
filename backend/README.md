@@ -13,11 +13,12 @@ clojure -M -m price-tracker.migrator
 ## Environment
 See the root `.env.example` for required variables.
 
-`DATABASE_URL` is required for database access and migrations.
+`DATABASE_URL` is required for database access and migrations. `postgresql://` and
+`jdbc:postgresql://` formats are both accepted.
 
 ## Migration verification
 ```sh
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/price_tracker \
+DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
   ./scripts/verify-migrations.sh
 ```
 

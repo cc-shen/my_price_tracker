@@ -24,7 +24,9 @@
 (defmethod ig/init-key :app/http
   [_ {:keys [config handler]}]
   (let [port (get-in config [:http :port])]
-    (jetty/run-jetty handler {:port port :join? false})))
+    (jetty/run-jetty handler {:host "127.0.0.1"
+                              :port port
+                              :join? false})))
 
 (defmethod ig/halt-key! :app/http
   [_ server]

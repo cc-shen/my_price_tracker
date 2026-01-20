@@ -26,6 +26,16 @@
                 (responses/error-response 400 "invalid_json" "Malformed JSON payload.")))))
         (handler req)))))
 
+(defn- wrap-exceptions
+  [handler]
+  (fn [req]
+    (try
+      (handler req)
+      (catch Exception e
+        (binding [*out* *err*]
+          (println "Unhandled error:" (.getMessage e)))
+        (responses/error-response 500 "internal_error" "Unexpected error.")))))
+
 (defn routes
   [ds]
   [["/health" {:get health-handler}]
@@ -55,4 +65,5 @@
     (-> (ring/ring-handler router)
         (params/wrap-params)
         (wrap-json-body)
-        (wrap-cors-if-needed (:cors config)))))
+        (wrap-cors-if-needed (:cors config))
+        (wrap-exceptions))))
