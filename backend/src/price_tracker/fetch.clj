@@ -1,11 +1,15 @@
 (ns price-tracker.fetch
   (:require [clojure.string :as str])
-  (:import [java.net IDN InetAddress URI]
+  (:import [java.net IDN InetAddress URI URLDecoder URLEncoder]
            [java.net.http HttpClient HttpClient$Redirect HttpRequest HttpResponse$BodyHandlers]
            [java.time Duration]))
 
 (def ^:private max-url-length 2048)
 (def ^:private default-user-agent "price-tracker/0.1")
+(def ^:private tracking-params
+  #{"utm_source" "utm_medium" "utm_campaign" "utm_term" "utm_content"
+    "gclid" "fbclid" "mc_cid" "mc_eid" "ref" "ref_" "tag" "affid"
+    "affiliate" "irclickid" "irgwc" "scid"})
 
 (defn- normalize-host
   [host]
@@ -26,6 +30,50 @@
            :user-info (.getUserInfo uri)}))
       (catch Exception _
         nil))))
+
+(defn- decode-param
+  [value]
+  (when value
+    (URLDecoder/decode value "UTF-8")))
+
+(defn- encode-param
+  [value]
+  (URLEncoder/encode value "UTF-8"))
+
+(defn- parse-query
+  [query]
+  (when (seq query)
+    (->> (str/split query #"&")
+         (keep (fn [entry]
+                 (when (seq entry)
+                   (let [[raw-k raw-v] (str/split entry #"=" 2)
+                         key (decode-param raw-k)
+                         value (decode-param raw-v)]
+                     (when (seq key)
+                       [key value]))))))))
+
+(defn- build-query
+  [params]
+  (when (seq params)
+    (->> params
+         (map (fn [[k v]]
+                (str (encode-param k)
+                     (when (some? v)
+                       (str "=" (encode-param v))))))
+         (str/join "&"))))
+
+(defn normalize-url
+  [value]
+  (when-let [{:keys [uri host scheme user-info]} (parse-url value)]
+    (let [raw-query (.getRawQuery uri)
+          params (parse-query raw-query)
+          filtered (remove (fn [[k _]] (contains? tracking-params (str/lower-case k))) params)
+          query (build-query filtered)
+          path (let [path (.getRawPath uri)]
+                 (if (seq path) path "/"))
+          port (.getPort uri)
+          normalized (URI. scheme user-info host port path query nil)]
+      (.toASCIIString normalized))))
 
 (defn resolve-host
   [host]

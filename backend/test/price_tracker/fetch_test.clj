@@ -33,3 +33,9 @@
       (is (= "Unable to resolve host."
              (get-in (fetch/validate-url {:fetch {}} "https://example.com")
                      [:error :message]))))))
+
+(deftest normalize-url-removes-tracking
+  (is (= "https://example.com/product?color=red"
+         (fetch/normalize-url "https://example.com/product?utm_source=x&color=red&fbclid=abc")))
+  (is (= "https://example.com/"
+         (fetch/normalize-url "https://example.com#section"))))

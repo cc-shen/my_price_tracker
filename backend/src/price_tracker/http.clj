@@ -38,18 +38,18 @@
         (responses/error-response 500 "internal_error" "Unexpected error.")))))
 
 (defn routes
-  [ds]
+  [config ds]
   [["/health" {:get health-handler}]
    ["/api/products"
     {:get (api/list-products ds)
-     :post (api/create-product ds)}]
+     :post (api/create-product ds config)}]
    ["/api/products/:id"
     {:get (api/get-product ds)
      :delete (api/delete-product ds)}]
    ["/api/products/:id/prices"
     {:get (api/get-price-history ds)}]
    ["/api/products/:id/refresh"
-    {:post (api/refresh-product ds)}]])
+    {:post (api/refresh-product ds config)}]])
 
 (defn- wrap-cors-if-needed
   [handler {:keys [allowed-origins]}]
@@ -62,7 +62,7 @@
 (defn handler
   [config ds]
   (let [router (ring/router
-                (routes ds))]
+                (routes config ds))]
     (-> (ring/ring-handler router)
         (params/wrap-params)
         (rate-limit/wrap-rate-limit {:limit-per-minute (get-in config [:fetch :rate-limit-per-minute])})

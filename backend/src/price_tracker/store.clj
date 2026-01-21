@@ -45,13 +45,13 @@
      ORDER BY p.updated_at DESC"]))
 
 (defn insert-price-snapshot!
-  [ds {:keys [product-id price currency source raw-price-text checked-at]}]
+  [ds {:keys [product-id price currency source raw-price-text parser-version availability checked-at]}]
   (db/execute-one
    ds
-   ["INSERT INTO price_snapshots (product_id, price, currency, source, raw_price_text, checked_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+   ["INSERT INTO price_snapshots (product_id, price, currency, source, raw_price_text, parser_version, availability, checked_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING *"
-    product-id price currency source raw-price-text checked-at]))
+    product-id price currency source raw-price-text parser-version availability checked-at]))
 
 (defn update-last-checked!
   [ds {:keys [product-id checked-at]}]

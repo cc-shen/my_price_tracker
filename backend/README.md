@@ -23,8 +23,7 @@ DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
 ```
 
 ## API notes
-`POST /api/products` currently expects `url`, `title`, and numeric `price` (plus optional `currency`)
-until parser support lands in Milestone 2.
+`POST /api/products` expects `url` only; the backend fetches and parses title/price.
 
 ## Tests
 ```sh
