@@ -1,0 +1,109 @@
+import { FormEvent, useEffect, useState } from "react";
+import { apiSend } from "../api/client";
+import Modal from "./modal";
+import { useToast } from "./toast-provider";
+
+type CreateProductResponse = {
+  id: string;
+  title: string;
+  price: number;
+  currency?: string;
+  domain: string;
+  lastCheckedAt?: string;
+};
+
+type AddProductModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated: (product: CreateProductResponse) => void;
+};
+
+export default function AddProductModal({
+  isOpen,
+  onClose,
+  onCreated
+}: AddProductModalProps) {
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { pushToast } = useToast();
+
+  useEffect(() => {
+    if (!isOpen) {
+      setUrl("");
+      setError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!url.trim()) {
+      setError("Please enter a product URL.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const payload = await apiSend<CreateProductResponse>("/api/products", {
+        method: "POST",
+        body: JSON.stringify({ url: url.trim() })
+      });
+      if (!payload) {
+        throw new Error("No response returned.");
+      }
+      onCreated(payload);
+      pushToast({
+        message: "Product added. Tracking starts now.",
+        tone: "success"
+      });
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to add product.";
+      setError(message);
+      pushToast({ message, tone: "error" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="Add a product" isOpen={isOpen} onClose={onClose}>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+          Product URL
+          <input
+            type="url"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+          />
+        </label>
+        {error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            {error}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isSubmitting ? "Adding..." : "Add product"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

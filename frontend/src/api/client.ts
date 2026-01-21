@@ -41,5 +41,14 @@ export async function apiSend<T>(
     throw new Error(message || `Request failed with ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  const bodyText = await response.text();
+  if (!bodyText) {
+    return null as T;
+  }
+
+  return JSON.parse(bodyText) as T;
 }
