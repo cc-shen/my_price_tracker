@@ -1,5 +1,6 @@
 (ns price-tracker.api-test
   (:require [cheshire.core :as json]
+            [cheshire.parse]
             [clojure.test :refer [deftest is testing]]
             [price-tracker.api :as api]
             [price-tracker.fetch :as fetch]
@@ -10,7 +11,8 @@
   [resp]
   (when-let [body (:body resp)]
     (let [raw (if (string? body) body (slurp body))]
-      (json/parse-string raw true))))
+      (binding [cheshire.parse/*use-bigdecimals?* true]
+        (json/parse-string raw true)))))
 
 (deftest create-product-validation
   (let [config {:fetch {}}
@@ -100,7 +102,7 @@
           body (parse-body resp)]
       (is (= 200 (:status resp)))
       (is (= "Item" (-> body first :title)))
-      (is (= 10.0 (-> body first :currentPrice))))))
+      (is (= 10.0M (-> body first :currentPrice))))))
 
 (deftest get-product-invalid-id
   (let [handler (api/get-product nil)

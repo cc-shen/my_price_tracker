@@ -1,5 +1,6 @@
 (ns price-tracker.integration-test
   (:require [cheshire.core :as json]
+            [cheshire.parse]
             [clojure.test :refer [deftest is use-fixtures]]
             [price-tracker.api :as api]
             [price-tracker.db :as db]
@@ -28,7 +29,8 @@
   [resp]
   (when-let [body (:body resp)]
     (let [raw (if (string? body) body (slurp body))]
-      (json/parse-string raw true))))
+      (binding [cheshire.parse/*use-bigdecimals?* true]
+        (json/parse-string raw true)))))
 
 (defn- with-db
   [f]

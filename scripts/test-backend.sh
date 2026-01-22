@@ -6,6 +6,13 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ".env"
+  set +a
+fi
+
 DB_NAME="${TEST_DB_NAME:-}"
 DB_USER="${TEST_DB_USER:-${POSTGRES_USER:-}}"
 DB_PASSWORD="${TEST_DB_PASSWORD:-${POSTGRES_PASSWORD:-}}"

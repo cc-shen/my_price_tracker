@@ -1,5 +1,6 @@
 (ns price-tracker.http-test
   (:require [cheshire.core :as json]
+            [cheshire.parse]
             [clojure.test :refer [deftest is]]
             [price-tracker.http :as http]
             [ring.mock.request :as mock]))
@@ -8,7 +9,8 @@
   [resp]
   (when-let [body (:body resp)]
     (let [raw (if (string? body) body (slurp body))]
-      (json/parse-string raw true))))
+      (binding [cheshire.parse/*use-bigdecimals?* true]
+        (json/parse-string raw true)))))
 
 (deftest invalid-json-body
   (let [handler (http/handler {:cors {}} nil)

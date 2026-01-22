@@ -2,6 +2,13 @@
 
 Local-only app intended to run on a Macbook; no public deployment target.
 
+## Environment
+Create a local `.env` from the example and adjust credentials as needed:
+```sh
+cp .env.example .env
+```
+The `.env` file is ignored by git.
+
 ## Docker (backend + db)
 ```sh
 docker compose up --build
