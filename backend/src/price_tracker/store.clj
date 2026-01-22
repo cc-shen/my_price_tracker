@@ -2,6 +2,12 @@
   (:require [clojure.string :as str]
             [price-tracker.db :as db]))
 
+(defn- ->timestamp
+  [value]
+  (if (instance? java.time.Instant value)
+    (java.sql.Timestamp/from ^java.time.Instant value)
+    value))
+
 (defn create-product!
   [ds {:keys [url canonical-url domain title currency]}]
   (db/execute-one
@@ -51,7 +57,7 @@
    ["INSERT INTO price_snapshots (product_id, price, currency, source, raw_price_text, parser_version, availability, checked_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING *"
-    product-id price currency source raw-price-text parser-version availability checked-at]))
+    product-id price currency source raw-price-text parser-version availability (->timestamp checked-at)]))
 
 (defn update-last-checked!
   [ds {:keys [product-id checked-at]}]
@@ -61,7 +67,7 @@
      SET last_checked_at = ?, updated_at = now()
      WHERE id = ?
      RETURNING *"
-    checked-at product-id]))
+    (->timestamp checked-at) product-id]))
 
 (defn price-history
   [ds {:keys [product-id from to]}]
@@ -73,10 +79,10 @@
         [sql params] (cond-> [base-sql [product-id]]
                        from (->
                              (update 0 str " AND checked_at >= ?")
-                             (update 1 conj from))
+                             (update 1 conj (->timestamp from)))
                        to (->
                            (update 0 str " AND checked_at <= ?")
-                           (update 1 conj to))
+                           (update 1 conj (->timestamp to)))
                        true (->
                              (update 0 str " ORDER BY checked_at ASC")))]
     (db/query ds (into [sql] params))))

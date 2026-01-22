@@ -6,10 +6,15 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-DB_NAME="price_tracker_test"
-DB_USER="price_tracker"
-DB_PASSWORD="price_tracker"
+DB_NAME="${TEST_DB_NAME:-}"
+DB_USER="${TEST_DB_USER:-${POSTGRES_USER:-}}"
+DB_PASSWORD="${TEST_DB_PASSWORD:-${POSTGRES_PASSWORD:-}}"
 HOST_PORT="55432"
+
+if [[ -z "${DB_NAME}" || -z "${DB_USER}" || -z "${DB_PASSWORD}" ]]; then
+  echo "backend tests require TEST_DB_NAME/TEST_DB_USER/TEST_DB_PASSWORD (or POSTGRES_USER/POSTGRES_PASSWORD) to be set"
+  exit 1
+fi
 
 container_id=$(docker run --rm -d \
   -e POSTGRES_DB="${DB_NAME}" \
