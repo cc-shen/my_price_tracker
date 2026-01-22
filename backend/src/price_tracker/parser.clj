@@ -172,13 +172,14 @@
                          (parse-price-text price-text)
                          {:price (parse-number (str price))})]
       (when (or title (:price parsed-price))
-        (merge {:title (when (seq title) title)
-                :currency currency
-                :availability availability
-                :parser-source "json-ld"
-                :parser-version "json-ld-v1"}
-               parsed-price
-               (when price-text {:raw-price-text price-text}))))))
+        (let [currency-final (or currency (:currency parsed-price))]
+          (merge {:title (when (seq title) title)
+                  :currency currency-final
+                  :availability availability
+                  :parser-source "json-ld"
+                  :parser-version "json-ld-v1"}
+                 (dissoc parsed-price :currency)
+                 (when price-text {:raw-price-text price-text})))))))
 
 (defn- parse-json-ld
   [document]
@@ -204,16 +205,17 @@
                      (select-meta-content document "meta[property=og:price:currency]"))
         parsed-price (parse-price-text price-text)]
     (when (or title parsed-price)
-      (merge {:title title
-              :currency (or currency (:currency parsed-price))
-              :parser-source "open-graph"
-              :parser-version "open-graph-v1"}
-             parsed-price))))
+      (let [currency-final (or currency (:currency parsed-price))]
+        (merge {:title title
+                :currency currency-final
+                :parser-source "open-graph"
+                :parser-version "open-graph-v1"}
+               (dissoc parsed-price :currency))))))
 
 (defn- parse-regex
   [document]
   (let [text (.text document)
-        match (re-find #"(USD|US\$|CAD|C\$|CA\$|EUR|GBP|JPY|€|£|¥|\$)\s*\d{1,3}(?:[\d,\s]*)(?:\.\d{1,2})?" text)
+        match (re-find #"(?:USD|US\$|CAD|C\$|CA\$|EUR|GBP|JPY|€|£|¥|\$)\s*\d{1,3}(?:[\d,\s]*)(?:\.\d{1,2})?" text)
         parsed (parse-price-text match)]
     (when parsed
       (merge parsed

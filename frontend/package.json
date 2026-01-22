@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "rspack dev --host 0.0.0.0 --port 3000",
     "build": "rspack build",
@@ -17,7 +18,7 @@
     "@eslint/js": "^9.9.0",
     "@rspack/cli": "^1.0.5",
     "@rspack/core": "^1.0.5",
-    "@rspack/plugin-html": "^1.0.5",
+    "@rspack/plugin-html": "^0.5.8",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.6.0",

@@ -225,6 +225,9 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 ## 5) Suggested Technical Architecture
 
 ### 5.1 Frontend (Rspack + React + TypeScript + Tailwind CSS)
+**Package management**
+- Use Yarn and commit `yarn.lock` to freeze dependency versions.
+
 **Pages**
 - `/` Dashboard
 - `/products/:id` Product details with chart

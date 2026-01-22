@@ -53,7 +53,7 @@
                                                     :raw-price-text "$12.50"
                                                     :parser-version "test-v1"
                                                     :availability "in-stock"})
-                  #'price-tracker.api/with-transaction (fn [_ f] (f :tx))
+                  price-tracker.api/with-transaction (fn [_ f] (f :tx))
                   store/create-product! (fn [_ _] {:id "p1"
                                                    :title "Parsed Item"
                                                    :domain "example.com"})
@@ -66,7 +66,7 @@
         (is (= 201 (:status resp)))
         (is (= "p1" (:id body)))
         (is (= "Parsed Item" (:title body)))
-        (is (= 12.50M (:price body)))))))
+        (is (== 12.50M (:price body)))))))
 
 (deftest create-product-conflict
   (let [config {:fetch {}}
@@ -77,7 +77,7 @@
                   parser/parse-product (fn [_ _ _] {:title "Parsed Item"
                                                     :price 12.50M
                                                     :currency "USD"})
-                  #'price-tracker.api/with-transaction (fn [_ f] (f :tx))
+                  price-tracker.api/with-transaction (fn [_ f] (f :tx))
                   store/create-product! (fn [_ _]
                                           (throw (org.postgresql.util.PSQLException.
                                                   "dup"

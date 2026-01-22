@@ -5,7 +5,10 @@
 
 (defn- ipv4
   [a b c d]
-  (InetAddress/getByAddress (byte-array [(byte a) (byte b) (byte c) (byte d)])))
+  (InetAddress/getByAddress (byte-array [(unchecked-byte a)
+                                         (unchecked-byte b)
+                                         (unchecked-byte c)
+                                         (unchecked-byte d)])))
 
 (deftest validate-url
   (with-redefs [fetch/resolve-host (fn [_] [(ipv4 93 184 216 34)])]

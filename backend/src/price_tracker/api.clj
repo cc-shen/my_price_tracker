@@ -6,15 +6,7 @@
             [price-tracker.responses :as responses]
             [price-tracker.store :as store])
   (:import [java.time Instant]
-           [java.util UUID]
            [org.postgresql.util PSQLException]))
-
-(defn- parse-uuid
-  [value]
-  (try
-    (UUID/fromString value)
-    (catch IllegalArgumentException _
-      nil)))
 
 (defn- sql-state
   [^Exception e]
@@ -78,7 +70,7 @@
       (if error
         (responses/error-response 422 (:type error) (:message error))
         (let [{:keys [error fetch-result]} (let [result (fetch/fetch-html config (:fetch-url ok))]
-                                            {:error (:error result) :fetch-result (:ok result)})]
+                                             {:error (:error result) :fetch-result (:ok result)})]
           (if error
             (fetch-error-response error)
             (let [parsed (parser/parse-product parser/default-registry (:domain ok) (:body fetch-result))
@@ -209,7 +201,7 @@
         :else
         (if-let [product (store/get-product ds id)]
           (let [target-url (or (:canonical_url product) (:url product))
-                {:keys [ok error]} (fetch/validate-url config target-url)]
+                {:keys [error]} (fetch/validate-url config target-url)]
             (cond
               error (fetch-error-response error)
               :else

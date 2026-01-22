@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+  - repo: https://github.com/clj-kondo/clj-kondo
+    rev: v2026.01.19
+    hooks:
+      - id: clj-kondo
+        files: ^backend/.*\.clj$
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: frontend-eslint
+        entry: yarn --cwd frontend run lint
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$

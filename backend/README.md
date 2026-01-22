@@ -27,7 +27,12 @@ DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
 
 ## Tests
 ```sh
-clojure -M:test -m clojure.test
+clojure -M:test -m price-tracker.test-runner
+```
+
+To run tests against a temporary Postgres container:
+```sh
+make test-backend
 ```
 
 ## Make targets

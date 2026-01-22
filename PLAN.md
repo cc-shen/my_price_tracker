@@ -7,6 +7,7 @@
 - Decide and document persistence choice (default: PostgreSQL as suggested in requirements).
 - Add/extend `docs/architecture.md` with DB choice, migration tool, and rationale.
 - Add `.env.example` with backend/frontend variables from requirements.
+- Standardize frontend package management on Yarn and commit `yarn.lock`.
 
 ## Milestone 1: Backend foundation (API + DB)
 

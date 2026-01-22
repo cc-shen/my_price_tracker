@@ -27,9 +27,9 @@ This repository uses a React + TypeScript + Tailwind CSS frontend bundled with r
 
 ## Build, Test, and Development Commands
 Define these once the tooling is wired up; examples below show the intended shape:
-- `cd frontend && npm run dev` — run rspack dev server with hot reload.
-- `cd frontend && npm run build` — produce a production bundle.
-- `cd frontend && npm run lint` — run TypeScript/ESLint checks.
+- `cd frontend && yarn run dev` — run rspack dev server with hot reload.
+- `cd frontend && yarn run build` — produce a production bundle.
+- `cd frontend && yarn run lint` — run TypeScript/ESLint checks.
 - `cd backend && clojure -M:dev` — start the Clojure service locally.
 - `cd backend && clojure -M:test` — run backend tests.
 
