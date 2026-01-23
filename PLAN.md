@@ -100,9 +100,9 @@
 
 ### 6.2 Frontend tests
 
-- Component tests for add product flow.
-- Delete confirmation behavior.
-- Chart rendering with mocked data.
+- [x] Component tests for add product flow.
+- [x] Delete confirmation behavior.
+- [x] Chart rendering with mocked data.
 
 ## Milestone 7: Containerization & docs
 
