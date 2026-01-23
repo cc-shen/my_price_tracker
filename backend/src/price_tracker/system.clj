@@ -11,7 +11,7 @@
   (config/load-config))
 
 (defmethod ig/init-key :app/handler
-  [_ {:keys [config db] :logging _logging}]
+  [_ {:keys [config db]}]
   (http/handler config db))
 
 (defmethod ig/init-key :app/logging

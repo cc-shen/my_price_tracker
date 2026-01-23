@@ -55,7 +55,7 @@ clean:
 	rm -rf $(VENV_DIR)
 
 docker-up:
-	docker compose up -d
+	docker compose up -d --build
 
 docker-down:
 	docker compose down
