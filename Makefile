@@ -1,4 +1,4 @@
-.PHONY: help frontend-dev frontend-build frontend-lint frontend-test backend-dev backend-setup backend-test test-backend test migrate verify-migrations pre-commit-install dev clean venv
+.PHONY: help frontend-dev frontend-build frontend-lint frontend-test backend-dev backend-setup backend-test test-backend test migrate verify-migrations pre-commit-install dev clean venv docker-up docker-down docker-restart docker-logs docker-ps
 
 PYTHON_BIN ?= python3.14
 VENV_DIR ?= .venv
@@ -6,7 +6,7 @@ VENV_PYTHON := $(VENV_DIR)/bin/python
 PYTHON := $(shell if command -v $(PYTHON_BIN) >/dev/null 2>&1; then echo $(PYTHON_BIN); else echo python3; fi)
 
 help:
-	@echo "Targets: frontend-dev, frontend-build, frontend-lint, frontend-test, backend-dev, backend-setup, backend-test, test-backend, test, migrate, verify-migrations, pre-commit-install, dev, clean"
+	@echo "Targets: frontend-dev, frontend-build, frontend-lint, frontend-test, backend-dev, backend-setup, backend-test, test-backend, test, migrate, verify-migrations, pre-commit-install, dev, clean, docker-up, docker-down, docker-restart, docker-logs, docker-ps"
 
 frontend-dev:
 	cd frontend && yarn run dev
@@ -53,3 +53,18 @@ dev: pre-commit-install
 
 clean:
 	rm -rf $(VENV_DIR)
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-restart:
+	docker compose restart
+
+docker-logs:
+	docker compose logs -f --tail=200
+
+docker-ps:
+	docker compose ps

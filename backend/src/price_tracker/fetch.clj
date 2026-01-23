@@ -1,11 +1,8 @@
 (ns price-tracker.fetch
   (:require [clojure.string :as str])
-  (:import [java.net IDN InetAddress URI URLDecoder URLEncoder]
-           [java.net.http HttpClient HttpClient$Redirect HttpRequest HttpResponse$BodyHandlers]
-           [java.time Duration]))
+  (:import [java.net IDN InetAddress URI URLDecoder URLEncoder]))
 
 (def ^:private max-url-length 2048)
-(def ^:private default-user-agent "price-tracker/0.1")
 (def ^:private tracking-params
   #{"utm_source" "utm_medium" "utm_campaign" "utm_term" "utm_content"
     "gclid" "fbclid" "mc_cid" "mc_eid" "ref" "ref_" "tag" "affid"
@@ -75,10 +72,6 @@
           normalized (URI. scheme user-info host port path query nil)]
       (.toASCIIString normalized))))
 
-(defn resolve-host
-  [host]
-  (InetAddress/getAllByName host))
-
 (defn- localhost-host?
   [host]
   (when host
@@ -101,6 +94,20 @@
       (.isSiteLocalAddress addr)
       (.isMulticastAddress addr)
       (ipv6-unique-local? addr)))
+
+(defn- ip-literal?
+  [host]
+  (when host
+    (or (re-matches #"\d{1,3}(?:\.\d{1,3}){3}" host)
+        (str/includes? host ":"))))
+
+(defn- private-ip-literal?
+  [host]
+  (when (ip-literal? host)
+    (try
+      (private-address? (InetAddress/getByName host))
+      (catch Exception _
+        false))))
 
 (defn- allowed-domain?
   [host allowed-domains]
@@ -125,6 +132,9 @@
       (localhost-host? (:host parsed))
       {:error {:type "validation_error" :message "Localhost URLs are not allowed."}}
 
+      (private-ip-literal? (:host parsed))
+      {:error {:type "validation_error" :message "Private or local addresses are not allowed."}}
+
       (and (seq allowed-domains) (not (allowed-domain? (:host parsed) allowed-domains)))
       {:error {:type "validation_error" :message "Domain is not allowed."}}
 
@@ -132,36 +142,4 @@
       (let [ascii-host (try
                          (IDN/toASCII (:host parsed))
                          (catch Exception _ (:host parsed)))]
-        (try
-          (let [addresses (resolve-host ascii-host)]
-            (if (some private-address? addresses)
-              {:error {:type "validation_error" :message "Private or local addresses are not allowed."}}
-              {:ok (assoc parsed :host ascii-host)}))
-          (catch Exception _
-            {:error {:type "validation_error" :message "Unable to resolve host."}}))))))
-
-(defn fetch-html
-  [config url]
-  (let [{:keys [timeout-ms user-agent]} (:fetch config)
-        timeout-ms (or timeout-ms 10000)
-        user-agent (or user-agent default-user-agent)
-        {:keys [ok error]} (validate-url config url)]
-    (if error
-      {:error error}
-      (let [client (-> (HttpClient/newBuilder)
-                       (.connectTimeout (Duration/ofMillis timeout-ms))
-                       (.followRedirects HttpClient$Redirect/NEVER)
-                       (.build))
-            request (-> (HttpRequest/newBuilder (:uri ok))
-                        (.timeout (Duration/ofMillis timeout-ms))
-                        (.header "User-Agent" user-agent)
-                        (.GET)
-                        (.build))
-            response (.send client request (HttpResponse$BodyHandlers/ofString))
-            status (.statusCode response)]
-        (if (<= 200 status 299)
-          {:ok {:status status
-                :body (.body response)}}
-          {:error {:type "fetch_error"
-                   :message "Fetch failed."
-                   :status status}})))))
+        {:ok (assoc parsed :host ascii-host)}))))

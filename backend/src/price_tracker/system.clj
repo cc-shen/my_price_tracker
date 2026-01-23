@@ -3,6 +3,7 @@
             [price-tracker.config :as config]
             [price-tracker.db :as db]
             [price-tracker.http :as http]
+            [price-tracker.logging :as logging]
             [ring.adapter.jetty :as jetty]))
 
 (defmethod ig/init-key :app/config
@@ -10,8 +11,12 @@
   (config/load-config))
 
 (defmethod ig/init-key :app/handler
-  [_ {:keys [config db]}]
+  [_ {:keys [config db] :logging _logging}]
   (http/handler config db))
+
+(defmethod ig/init-key :app/logging
+  [_ {:keys [config]}]
+  (logging/configure! config))
 
 (defmethod ig/init-key :app/db
   [_ {:keys [config]}]
@@ -23,8 +28,9 @@
 
 (defmethod ig/init-key :app/http
   [_ {:keys [config handler]}]
-  (let [port (get-in config [:http :port])]
-    (jetty/run-jetty handler {:host "127.0.0.1"
+  (let [port (get-in config [:http :port])
+        host (get-in config [:http :host])]
+    (jetty/run-jetty handler {:host host
                               :port port
                               :join? false})))
 
@@ -35,8 +41,10 @@
 (defn system-config
   []
   {:app/config {}
+   :app/logging {:config (ig/ref :app/config)}
    :app/db {:config (ig/ref :app/config)}
    :app/handler {:config (ig/ref :app/config)
+                 :logging (ig/ref :app/logging)
                  :db (ig/ref :app/db)}
    :app/http {:config (ig/ref :app/config)
               :handler (ig/ref :app/handler)}})

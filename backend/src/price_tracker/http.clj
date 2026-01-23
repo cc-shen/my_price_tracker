@@ -6,7 +6,8 @@
             [price-tracker.responses :as responses]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
-            [ring.middleware.params :as params]))
+            [ring.middleware.params :as params]
+            [taoensso.timbre :as log]))
 
 (defn- health-handler
   [_]
@@ -33,9 +34,23 @@
     (try
       (handler req)
       (catch Exception e
-        (binding [*out* *err*]
-          (println "Unhandled error:" (.getMessage e)))
+        (log/error e "Unhandled error during request.")
         (responses/error-response 500 "internal_error" "Unexpected error.")))))
+
+(defn- wrap-request-logging
+  [handler]
+  (fn [req]
+    (let [start (System/nanoTime)
+          resp (handler req)
+          duration-ms (/ (- (System/nanoTime) start) 1000000.0)
+          status (or (:status resp) 200)
+          method (-> req :request-method name str/upper-case)
+          uri (:uri req)
+          message (format "%s %s -> %d (%.1fms)" method uri status duration-ms)]
+      (if (>= status 400)
+        (log/warn message)
+        (log/info message))
+      resp)))
 
 (defn routes
   [config ds]
@@ -53,11 +68,15 @@
 
 (defn- wrap-cors-if-needed
   [handler {:keys [allowed-origins]}]
-  (if (seq allowed-origins)
-    (cors/wrap-cors handler
-                    :access-control-allow-origin allowed-origins
-                    :access-control-allow-methods [:get :post :put :delete :options])
-    handler))
+  (let [origin->pattern (fn [origin]
+                          (if (instance? java.util.regex.Pattern origin)
+                            origin
+                            (re-pattern (str "^" (java.util.regex.Pattern/quote (str origin)) "$"))))]
+    (if (seq allowed-origins)
+      (cors/wrap-cors handler
+                      :access-control-allow-origin (mapv origin->pattern allowed-origins)
+                      :access-control-allow-methods [:get :post :put :delete :options])
+      handler)))
 
 (defn handler
   [config ds]
@@ -68,4 +87,5 @@
         (rate-limit/wrap-rate-limit {:limit-per-minute (get-in config [:fetch :rate-limit-per-minute])})
         (wrap-json-body)
         (wrap-cors-if-needed (:cors config))
-        (wrap-exceptions))))
+        (wrap-exceptions)
+        (wrap-request-logging))))

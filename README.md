@@ -9,17 +9,21 @@ cp .env.example .env
 ```
 The `.env` file is ignored by git.
 
-## Docker (backend + db)
+## Docker (frontend + backend + db)
 ```sh
 docker compose up --build
 ```
 
 Backend runs on `http://127.0.0.1:8080` and executes migrations on startup (only pending migrations are applied).
+Frontend runs on `http://127.0.0.1:3000`.
+Postgres data is persisted in the `pgdata` volume.
 
-Frontend is currently behind a compose profile since the `frontend/` app is not scaffolded yet:
-```sh
-docker compose --profile frontend up --build
-```
+Note: the compose file defaults the backend `DATABASE_URL` to the `db` service hostname. If you run the backend
+locally (outside Docker), update `DATABASE_URL` in `.env` to use `localhost`.
+
+## Adding products
+Use the Add Product modal and enter the title + price manually for each URL. The app does not
+perform automatic scraping.
 
 ## Make targets
 ```sh

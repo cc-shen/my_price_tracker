@@ -8,12 +8,12 @@ This repository uses a React + TypeScript + Tailwind CSS frontend bundled with r
 - Keep changes aligned with the requirements (functional + non-functional) and the milestone plan.
 
 ## Requirements & Plan Highlights
-- Core MVP: add product by URL, dashboard list, product detail with price history chart + range presets, delete with confirmation, manual refresh.
-- Security is mandatory: SSRF protections, input validation, rate limiting, safe logging, and SQL injection protection.
+- Core MVP: add product by URL with manual title/price entry, dashboard list, product detail with price history chart + range presets, delete with confirmation, manual refresh.
+- Security is mandatory: input validation, rate limiting, safe logging, and SQL injection protection.
 - Deployment is local-only (run on a Macbook), with no public exposure of services.
 - Persistence: recommended Postgres with migrations and cascade deletes; document final choice before adding a dependency.
 - Deployment: Docker/Podman with separate frontend/backend/DB containers and persistent volumes.
-- Parsing: domain-based parser registry with DOM → JSON-LD → OpenGraph → regex fallback.
+- No automatic scraping or parsing of retailer sites.
 
 ## Project Structure & Module Organization
 - `frontend/`: React app (e.g., `frontend/src/`, `frontend/public/`).

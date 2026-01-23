@@ -4,7 +4,6 @@
             [clojure.test :refer [deftest is testing]]
             [price-tracker.api :as api]
             [price-tracker.fetch :as fetch]
-            [price-tracker.parser :as parser]
             [price-tracker.store :as store]))
 
 (defn- parse-body
@@ -30,44 +29,40 @@
     (testing "rejects invalid URL"
       (with-redefs [fetch/validate-url (fn [_ _] {:error {:type "validation_error" :message "Invalid URL."}})
                     fetch/normalize-url (fn [_] nil)]
-        (let [resp (handler {:json-body {:url "not-a-url"}})]
+        (let [resp (handler {:json-body {:url "not-a-url"
+                                         :manual {:title "Manual Item"
+                                                  :price 12.50}}})]
           (is (= 422 (:status resp)))
           (is (= "validation_error" (get-in (parse-body resp) [:error :type]))))))
 
-    (testing "rejects parse error when metadata missing"
+    (testing "rejects missing manual entry"
       (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
-                    fetch/normalize-url (fn [_] "https://example.com/item")
-                    fetch/fetch-html (fn [_ _] {:ok {:status 200 :body "<html></html>"}})
-                    parser/parse-product (fn [_ _ _] nil)]
+                    fetch/normalize-url (fn [_] "https://example.com/item")]
         (let [resp (handler {:json-body {:url "https://example.com/item"}})]
           (is (= 422 (:status resp)))
-          (is (= "parse_error" (get-in (parse-body resp) [:error :type]))))))))
+          (is (= "validation_error" (get-in (parse-body resp) [:error :type]))))))))
 
 (deftest create-product-success
   (let [config {:fetch {}}
         handler (api/create-product nil config)]
     (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
                   fetch/normalize-url (fn [_] "https://example.com/item")
-                  fetch/fetch-html (fn [_ _] {:ok {:status 200 :body "<html></html>"}})
-                  parser/parse-product (fn [_ _ _] {:title "Parsed Item"
-                                                    :price 12.50M
-                                                    :currency "USD"
-                                                    :raw-price-text "$12.50"
-                                                    :parser-version "test-v1"
-                                                    :availability "in-stock"})
                   price-tracker.api/with-transaction (fn [_ f] (f :tx))
                   store/create-product! (fn [_ _] {:id "p1"
-                                                   :title "Parsed Item"
+                                                   :title "Manual Item"
                                                    :domain "example.com"})
                   store/insert-price-snapshot! (fn [_ _] {:price 12.50M
                                                           :currency "USD"
                                                           :checked_at "now"})
                   store/update-last-checked! (fn [_ _] nil)]
-      (let [resp (handler {:json-body {:url "https://example.com/item"}})
+      (let [resp (handler {:json-body {:url "https://example.com/item"
+                                       :manual {:title "Manual Item"
+                                                :price 12.50
+                                                :currency "USD"}}})
             body (parse-body resp)]
         (is (= 201 (:status resp)))
         (is (= "p1" (:id body)))
-        (is (= "Parsed Item" (:title body)))
+        (is (= "Manual Item" (:title body)))
         (is (== 12.50M (:price body)))))))
 
 (deftest create-product-conflict
@@ -75,16 +70,14 @@
         handler (api/create-product nil config)]
     (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
                   fetch/normalize-url (fn [_] "https://example.com/item")
-                  fetch/fetch-html (fn [_ _] {:ok {:status 200 :body "<html></html>"}})
-                  parser/parse-product (fn [_ _ _] {:title "Parsed Item"
-                                                    :price 12.50M
-                                                    :currency "USD"})
                   price-tracker.api/with-transaction (fn [_ f] (f :tx))
                   store/create-product! (fn [_ _]
                                           (throw (org.postgresql.util.PSQLException.
                                                   "dup"
                                                   org.postgresql.util.PSQLState/UNIQUE_VIOLATION)))]
-      (let [resp (handler {:json-body {:url "https://example.com/item"}})]
+      (let [resp (handler {:json-body {:url "https://example.com/item"
+                                       :manual {:title "Manual Item"
+                                                :price 12.50}}})]
         (is (= 409 (:status resp)))
         (is (= "already_exists" (get-in (parse-body resp) [:error :type])))))))
 
@@ -126,7 +119,7 @@
 
 (deftest refresh-product-not-found
   (with-redefs [store/get-product (fn [_ _] nil)]
-    (let [handler (api/refresh-product nil {:fetch {}})
+    (let [handler (api/refresh-product nil {})
           resp (handler {:path-params {:id "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}})]
       (is (= 404 (:status resp)))
       (is (= "not_found" (get-in (parse-body resp) [:error :type]))))))

@@ -33,33 +33,27 @@
 - [x] `DELETE /api/products/:id` (delete product)
 - [x] Validation and error responses (400/404/422/500) with consistent payloads.
 
-## Milestone 2: Fetching + parsing system
+## Milestone 2: Manual entry + validation
 
-### 2.1 Fetching & SSRF protections
+### 2.1 URL validation
 
 - [x] Implement URL validation: http/https only, length limits.
-- [x] Block private IP ranges and localhost; validate DNS resolution defensively.
-- [x] Add request timeouts, user agent, and basic rate limiting per endpoint.
+- [x] Block private IP ranges and localhost for IP literals.
+- [x] Add basic rate limiting per endpoint.
 
-### 2.2 Parser registry
+### 2.2 Manual entry validation
 
-- [x] Build a registry keyed by domain (exact + suffix match).
-- [x] Parsing pipeline order: DOM selectors -> JSON-LD -> OpenGraph -> regex fallback.
-- [x] Store `raw_price_text`, `parser_version`, and optional availability metadata.
-
-### 2.3 Initial retailer support
-
-- [x] Implement 1-2 domain parsers (e.g., Amazon + Lululemon) as MVP.
-- [x] Add HTML fixture samples for unit tests.
+- [x] Require title + price for manual product creation.
+- [x] Validate currency format (optional) and numeric price input.
 
 ## Milestone 3: Core backend flows
 
 - [x] Add product:
   - [x] Normalize URL
-  - [x] Fetch metadata
+  - [x] Validate manual metadata
   - [x] Insert product + initial snapshot
 - [x] Manual refresh:
-  - [x] Fetch latest price
+  - [x] Accept manual price input
   - [x] Append snapshot
 - [x] Delete product:
   - [x] Confirmed delete
@@ -94,7 +88,6 @@
 
 ### 6.1 Backend tests
 
-- [x] Parser unit tests with saved HTML fixtures.
 - [x] Integration tests for CRUD and price history endpoints.
 - [x] Migration tests to confirm schema expectations.
 
@@ -106,12 +99,11 @@
 
 ## Milestone 7: Containerization & docs
 
-- Add `docker-compose.yml` with frontend, backend, Postgres, and volumes.
-- Document local dev commands and env setup in README or `docs/`.
-- Bind services to localhost only and confirm persistence survives container restarts.
+- [x] Add `docker-compose.yml` with frontend, backend, Postgres, and volumes.
+- [x] Document local dev commands and env setup in README or `docs/`.
+- [x] Bind services to localhost only and confirm persistence survives container restarts.
 
 ## Milestone 8: Post-MVP enhancements
 
-- Scheduler for periodic refresh + rate limiting.
 - Search/sort filters and improved canonical URL handling.
 - Failure tracking and retries; better domain error reporting.

@@ -12,7 +12,9 @@
 
 (defn migrate
   []
-  (migratus/migrate (migratus-config)))
+  (let [config (migratus-config)]
+    (migratus/init config)
+    (migratus/migrate config)))
 
 (defn -main
   [& _]

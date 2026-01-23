@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { DefinePlugin } from "@rspack/core";
-import HtmlRspackPlugin from "@rspack/plugin-html";
+import HtmlRspackPluginModule from "@rspack/plugin-html";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,7 +45,7 @@ export default {
     ]
   },
   plugins: [
-    new HtmlRspackPlugin({
+    new (HtmlRspackPluginModule.default ?? HtmlRspackPluginModule)({
       template: "./public/index.html"
     }),
     new DefinePlugin({

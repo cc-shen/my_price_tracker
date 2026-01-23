@@ -51,6 +51,9 @@ describe("AddProductModal", () => {
       screen.getByLabelText("Product URL"),
       "https://example.com/product"
     );
+    await userEvent.type(screen.getByLabelText("Product title"), "Test item");
+    await userEvent.type(screen.getByLabelText("Price"), "19.99");
+    await userEvent.type(screen.getByLabelText("Currency (optional)"), "usd");
     await userEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     await waitFor(() => {
@@ -62,11 +65,41 @@ describe("AddProductModal", () => {
       "/api/products",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ url: "https://example.com/product" })
+        body: JSON.stringify({
+          url: "https://example.com/product",
+          manual: {
+            title: "Test item",
+            price: 19.99,
+            currency: "USD"
+          }
+        })
       })
     );
     expect(
       screen.getByText("Product added. Tracking starts now.")
     ).toBeInTheDocument();
+  });
+
+  it("validates missing manual fields", async () => {
+    const onCreated = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <ToastProvider>
+        <AddProductModal isOpen onClose={onClose} onCreated={onCreated} />
+      </ToastProvider>
+    );
+
+    await userEvent.type(
+      screen.getByLabelText("Product URL"),
+      "https://example.com/product"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    expect(
+      screen.getByText("Please enter a product title.")
+    ).toBeInTheDocument();
+    expect(apiSend).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });

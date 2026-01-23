@@ -11,10 +11,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 
 ### 1.2 Goals
 - Track products from multiple websites (Amazon, Lululemon, Aritzia, Jimmy Choo, etc.).
-- Automatically fetch:
-  - Product title/name
-  - Current price
-  - (Optionally) currency and availability status
+- Manually enter product title and price (no automatic scraping).
 - Display:
   - “All tracked items” overview page
   - Individual product detail page with **price history chart**
@@ -40,7 +37,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 
 ### 2.2 Core Use Cases
 1. **Add Product**
-   - User pastes URL → app fetches title + current price → saves product and initial price point.
+   - User pastes URL + enters title + current price → saves product and initial price point.
 2. **View All Products**
    - User sees a dashboard list/grid of all tracked products with current price and change summary.
 3. **View Price History**
@@ -61,25 +58,24 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - On submission:
   - Validate URL format
   - Normalize URL (strip tracking parameters if possible)
-  - Fetch product metadata:
+  - Require manual metadata entry:
     - `title`
     - `price` (numeric)
-    - `currency` (e.g., CAD/USD; if available)
+    - `currency` (e.g., CAD/USD; optional)
   - Store product record
   - Store initial price point in price history
 
 **Acceptance Criteria:**
-- If metadata fetch succeeds, product appears in the dashboard immediately.
-- If fetch fails, show a helpful error (e.g., “could not parse price from this site”).
+- If manual entry succeeds, product appears in the dashboard immediately.
+- If validation fails, show a helpful error (e.g., “title and price are required”).
 
 #### FR-2: Support multiple retailer domains
 **Requirements:**
-- System should support different parsing strategies depending on domain:
-  - Amazon, Lululemon, Aritzia, etc.
-- Design should allow adding new parsers without rewriting everything (plugin-style).
+- System should support tracking URLs from multiple retailer domains (Amazon, Lululemon, Aritzia, etc.).
+- Domain should be captured for display and filtering.
 
 **Acceptance Criteria:**
-- Parsers can be extended by adding a new handler keyed by domain pattern.
+- URLs from different supported domains can be added and listed.
 
 
 ### 3.2 Price History
@@ -90,7 +86,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
   - timestamp
   - price
   - currency
-  - optional metadata (availability, raw page hash, parser version)
+  - optional metadata (entry source, entry version)
 
 **Acceptance Criteria:**
 - At minimum, adding a product creates 1 data point.
@@ -165,21 +161,11 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 **Requirements:**
 - Provide a “Refresh price” button per product or on dashboard.
 - On refresh:
-  - fetch current price
+  - user enters the latest price (and optional currency)
   - append new price point
 
 **Acceptance Criteria:**
 - Refresh adds a new record with a new timestamp.
-
-#### FR-9: Automatic scheduled refresh (recommended next step)
-**Requirements:**
-- Background job runs periodically (e.g., every 6h / daily)
-- Fetches latest prices for all products
-- Rate limiting per domain to avoid bans
-
-**Acceptance Criteria:**
-- Job runs reliably and logs successes/failures.
-- Avoids hammering a single retailer.
 
 
 ## 4) Non-Functional Requirements
@@ -195,10 +181,6 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 
 ### 4.3 Security (Important)
 **Key requirements:**
-- Prevent SSRF:
-  - Only allow `http`/`https`
-  - Block private IP ranges and localhost targets
-  - Validate domain and DNS resolution defensively
 - Input validation:
   - URL length limits
   - Store normalized canonical URLs
@@ -209,14 +191,12 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Backend secrets:
   - Stored only in environment variables (no hardcoding)
 - Rate limiting:
-  - Prevent abuse of the “fetch price” endpoint
+  - Prevent abuse of product creation and refresh endpoints
 - Logging:
   - Never log sensitive headers/cookies
 
 ### 4.4 Maintainability / Extensibility
-- Retailer parsing should be modular and testable.
 - Clear separation between:
-  - parsing layer
   - persistence layer
   - API layer
   - UI layer
@@ -247,8 +227,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 ### 5.2 Backend (Clojure)
 **Responsibilities**
 - REST API for CRUD and querying price history
-- Scraping/parsing service for product metadata fetch
-- Background scheduler (optional in v1)
+- Manual product entry and price updates (no scraping)
 
 **Suggested libraries**
 - Ring + Reitit for routing
@@ -279,7 +258,7 @@ Recommended for persistence and efficient time-series queries.
 - `price` (numeric(12,2))
 - `currency` (text)
 - `checked_at` (timestamptz)
-- `source` (text, e.g., “manual”, “scheduler”)
+- `source` (text, e.g., “manual-entry”, “manual-refresh”)
 - `raw_price_text` (text, optional for debugging)
 - Index: `(product_id, checked_at desc)`
 
@@ -289,7 +268,14 @@ Recommended for persistence and efficient time-series queries.
 ### 6.1 Add product
 `POST /api/products`
 ```json
-{ "url": "https://..." }
+{
+  "url": "https://...",
+  "manual": {
+    "title": "Product name",
+    "price": 123.45,
+    "currency": "CAD"
+  }
+}
 ```
 
 Response:
@@ -340,34 +326,15 @@ Response:
 
 ### 6.5 Refresh price manually
 `POST /api/products/:id/refresh`
+```json
+{
+  "price": 120.00,
+  "currency": "CAD"
+}
+```
 
 ### 6.6 Delete product
 `DELETE /api/products/:id`
-
-
-## 7) Price Fetching / Parsing Strategy
-
-### 7.1 Approach
-- Identify retailer by `domain`
-- Use domain-specific parser function:
-  - Extract title
-  - Extract price
-- Store results in DB
-
-### 7.2 Parsing methods (priority order)
-1. Retailer-specific DOM parsing (HTML parsing with selectors)
-2. Structured data parsing:
-   - JSON-LD (schema.org Product/Offer)
-   - OpenGraph metadata (title fallback)
-3. Fallback heuristics (last-resort regex scanning)
-
-### 7.3 Anti-bot considerations
-Some sites will block automated requests.
-- MVP target: “best effort” for supported sites
-- Future options:
-  - Headless browser fetch
-  - Rotating user agent + respectful rate limiting
-  - Caching + conditional fetches
 
 
 ## 8) Deployment Requirements (Docker/Podman)
@@ -385,7 +352,6 @@ Backend:
 - `PORT`
 - `LOG_LEVEL`
 - `ALLOWED_DOMAINS` (optional allowlist)
-- `FETCH_TIMEOUT_MS`
 - `RATE_LIMIT_PER_MINUTE`
 
 Frontend:
@@ -401,19 +367,16 @@ Frontend:
 Log important events:
 - product added
 - refresh success/failure
-- parser used
-- parse errors with minimal context (avoid logging secrets)
+- validation failures with minimal context (avoid logging secrets)
 
 ### 9.2 Metrics (optional)
 - number of tracked products
-- average fetch duration
 - per-domain failure rate
 
 
 ## 10) Testing Requirements
 
 ### 10.1 Backend tests
-- Parser unit tests using saved HTML fixtures
 - Integration tests for API endpoints
 - DB migration tests
 
@@ -428,7 +391,7 @@ Log important events:
 
 **Must-have (MVP)**
 - Add product by URL
-- Parse title + price (for supported sites)
+- Manual entry of title + price
 - Dashboard list view
 - Product detail view with history chart
 - Date range presets
@@ -437,7 +400,6 @@ Log important events:
 - Dockerized deployment with Postgres
 
 **Nice-to-have (v1.1)**
-- Auto scheduled refresh
 - Search/filter/sort enhancements
 - Better canonical URL handling
 - Failure tracking + retries
@@ -452,9 +414,6 @@ Log important events:
 
 ## 12) Edge Cases & Error Handling
 - Invalid URL format
-- URL resolves to non-product page
 - Price not found / currency missing
-- Retailer blocks request (403 / CAPTCHA)
-- Product page changes DOM structure
 - Duplicate product URL added again (reject or de-dupe)
 - Variant-specific pricing (size/color changes price)

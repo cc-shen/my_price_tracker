@@ -5,7 +5,6 @@
             [price-tracker.api :as api]
             [price-tracker.db :as db]
             [price-tracker.fetch :as fetch]
-            [price-tracker.parser :as parser]
             [price-tracker.store :as store])
   (:import [java.time Instant]))
 
@@ -49,21 +48,17 @@
   (with-db
     (fn []
       (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
-                    fetch/normalize-url (fn [_] "https://example.com/item")
-                    fetch/fetch-html (fn [_ _] {:ok {:status 200 :body "<html></html>"}})
-                    parser/parse-product (fn [_ _ _] {:title "Parsed Item"
-                                                      :price 12.50M
-                                                      :currency "USD"
-                                                      :raw-price-text "$12.50"
-                                                      :parser-version "test-v1"
-                                                      :availability "in-stock"})]
+                    fetch/normalize-url (fn [_] "https://example.com/item")]
         (let [handler (api/create-product *ds* {:fetch {}})
-              resp (handler {:json-body {:url "https://example.com/item"}})
+              resp (handler {:json-body {:url "https://example.com/item"
+                                         :manual {:title "Manual Item"
+                                                  :price 12.50
+                                                  :currency "USD"}}})
               body (parse-body resp)
               product-id (java.util.UUID/fromString (:id body))
               product (store/get-product *ds* product-id)]
           (is (= 201 (:status resp)))
-          (is (= "Parsed Item" (:title product)))
+          (is (= "Manual Item" (:title product)))
           (is (= 1 (count-for-product "price_snapshots" product-id))))))))
 
 (deftest list-products-returns-latest-snapshot
@@ -134,17 +129,12 @@
                                             :currency "USD"
                                             :source "manual"
                                             :checked-at t1})
-        (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
-                      fetch/normalize-url (fn [_] "https://example.com/item")
-                      fetch/fetch-html (fn [_ _] {:ok {:status 200 :body "<html></html>"}})
-                      parser/parse-product (fn [_ _ _] {:price 9.50M
-                                                        :currency "USD"
-                                                        :raw-price-text "$9.50"
-                                                        :parser-version "test-v1"})]
-          (let [handler (api/refresh-product *ds* {:fetch {}})
-                resp (handler {:path-params {:id (str (:id product))}})]
-            (is (= 200 (:status resp)))
-            (is (= 2 (count-for-product "price_snapshots" (:id product))))))))))
+        (let [handler (api/refresh-product *ds* {})
+              resp (handler {:path-params {:id (str (:id product))}
+                             :json-body {:price 9.50
+                                         :currency "USD"}})]
+          (is (= 200 (:status resp)))
+          (is (= 2 (count-for-product "price_snapshots" (:id product)))))))))
 
 (deftest delete-product-cascades-snapshots
   (with-db

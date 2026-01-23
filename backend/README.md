@@ -23,7 +23,7 @@ DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
 ```
 
 ## API notes
-`POST /api/products` expects `url` only; the backend fetches and parses title/price.
+`POST /api/products` requires a manual payload with `title` and `price`; no automatic scraping is performed.
 
 ## Tests
 ```sh

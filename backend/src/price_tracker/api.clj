@@ -2,11 +2,81 @@
   (:require [clojure.string :as str]
             [next.jdbc :as jdbc]
             [price-tracker.fetch :as fetch]
-            [price-tracker.parser :as parser]
             [price-tracker.responses :as responses]
             [price-tracker.store :as store])
   (:import [java.time Instant]
            [org.postgresql.util PSQLException]))
+
+(def ^:private manual-price-pattern
+  #"\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?")
+
+(defn- parse-manual-price
+  [value]
+  (cond
+    (nil? value) nil
+    (number? value) (try (bigdec value) (catch Exception _ nil))
+    (string? value) (let [match (re-find manual-price-pattern value)
+                          cleaned (when match
+                                    (-> match
+                                        (str/replace #"," "")
+                                        (str/replace #"\s" "")))]
+                      (when (seq cleaned)
+                        (try (bigdec cleaned) (catch Exception _ nil))))
+    :else nil))
+
+(defn- normalize-manual-currency
+  [value]
+  (when (string? value)
+    (let [trimmed (str/upper-case (str/trim value))]
+      (when (seq trimmed)
+        (when (re-matches #"[A-Z]{3}" trimmed)
+          trimmed)))))
+
+(defn- parse-manual-entry
+  [manual]
+  (if (and manual (not (map? manual)))
+    {:error {:type "validation_error" :message "Manual entry must be an object."}}
+    (let [title (when (string? (:title manual))
+                  (str/trim (:title manual)))
+          price (parse-manual-price (:price manual))
+          currency-raw (:currency manual)
+          currency (normalize-manual-currency currency-raw)
+          currency-provided? (and (string? currency-raw)
+                                  (seq (str/trim currency-raw)))]
+      (cond
+        (str/blank? (or title ""))
+        {:error {:type "validation_error" :message "Manual entry requires a title."}}
+
+        (nil? price)
+        {:error {:type "validation_error" :message "Manual entry requires a valid price."}}
+
+        (and currency-provided? (nil? currency))
+        {:error {:type "validation_error" :message "Currency must be a 3-letter code (e.g., USD)."}}
+
+        :else
+        {:ok {:title title
+              :price price
+              :currency currency}}))))
+
+(defn- parse-refresh-input
+  [body]
+  (if (nil? body)
+    {:error {:type "invalid_json" :message "Request body must be JSON."}}
+    (let [price (parse-manual-price (:price body))
+          currency-raw (:currency body)
+          currency (normalize-manual-currency currency-raw)
+          currency-provided? (and (string? currency-raw)
+                                  (seq (str/trim currency-raw)))]
+      (cond
+        (nil? price)
+        {:error {:type "validation_error" :message "Price is required."}}
+
+        (and currency-provided? (nil? currency))
+        {:error {:type "validation_error" :message "Currency must be a 3-letter code (e.g., USD)."}}
+
+        :else
+        {:ok {:price price
+              :currency currency}}))))
 
 (defn- sql-state
   [^Exception e]
@@ -21,36 +91,22 @@
   (jdbc/with-transaction [tx ds]
     (f tx)))
 
-(defn- fetch-error-response
-  [error]
-  (case (:type error)
-    "validation_error" (responses/error-response 422 "validation_error" (:message error))
-    "fetch_error" (responses/error-response 502 "fetch_error" (:message error))
-    (responses/error-response 500 "internal_error" "Unexpected error.")))
-
-(defn- parse-product-error
-  [parsed {:keys [require-title] :or {require-title true}}]
-  (cond
-    (nil? parsed)
-    {:type "parse_error" :message "Unable to parse product metadata."}
-
-    (nil? (:price parsed))
-    {:type "parse_error" :message "Unable to parse product price."}
-
-    (and require-title (str/blank? (:title parsed)))
-    {:type "parse_error" :message "Unable to parse product title."}
-
-    :else nil))
-
 (defn- create-product-input
   [config body]
-  (let [{:keys [url]} body]
+  (let [{:keys [url manual]} body
+        manual-input (parse-manual-entry manual)]
     (cond
       (nil? body)
       {:error {:type "invalid_json" :message "Request body must be JSON."}}
 
       (str/blank? url)
       {:error {:type "validation_error" :message "URL is required."}}
+
+      (nil? manual)
+      {:error {:type "validation_error" :message "Manual entry is required."}}
+
+      (:error manual-input)
+      manual-input
 
       :else
       (let [{:keys [ok error]} (fetch/validate-url config url)
@@ -61,7 +117,7 @@
           :else {:ok {:url normalized
                       :canonical-url normalized
                       :domain (:host ok)
-                      :fetch-url normalized}})))))
+                      :manual (:ok manual-input)}})))))
 
 (defn create-product
   [ds config]
@@ -69,47 +125,38 @@
     (let [{:keys [ok error]} (create-product-input config (:json-body req))]
       (if error
         (responses/error-response 422 (:type error) (:message error))
-        (let [{:keys [error fetch-result]} (let [result (fetch/fetch-html config (:fetch-url ok))]
-                                             {:error (:error result) :fetch-result (:ok result)})]
-          (if error
-            (fetch-error-response error)
-            (let [parsed (parser/parse-product parser/default-registry (:domain ok) (:body fetch-result))
-                  parse-error (parse-product-error parsed {:require-title true})]
-              (if parse-error
-                (responses/error-response 422 (:type parse-error) (:message parse-error))
-                (try
-                  (with-transaction
-                    ds
-                    (fn [tx]
-                      (let [checked-at (Instant/now)
-                            product (store/create-product! tx {:url (:url ok)
-                                                               :canonical-url (:canonical-url ok)
-                                                               :domain (:domain ok)
-                                                               :title (:title parsed)
-                                                               :currency (:currency parsed)})
-                            snapshot (store/insert-price-snapshot! tx
-                                                                   {:product-id (:id product)
-                                                                    :price (:price parsed)
-                                                                    :currency (:currency parsed)
-                                                                    :source "manual"
-                                                                    :raw-price-text (:raw-price-text parsed)
-                                                                    :parser-version (:parser-version parsed)
-                                                                    :availability (:availability parsed)
-                                                                    :checked-at checked-at})]
-                        (store/update-last-checked! tx {:product-id (:id product)
-                                                        :checked-at checked-at})
-                        (responses/status-json
-                         201
-                         {:id (:id product)
-                          :title (:title product)
-                          :price (:price snapshot)
-                          :currency (:currency snapshot)
-                          :domain (:domain product)
-                          :lastCheckedAt (:checked_at snapshot)}))))
-                  (catch Exception e
-                    (if (= "23505" (sql-state e))
-                      (responses/error-response 409 "already_exists" "Product already exists.")
-                      (throw e))))))))))))
+        (let [manual (:manual ok)]
+          (try
+            (with-transaction
+              ds
+              (fn [tx]
+                (let [checked-at (Instant/now)
+                      product (store/create-product! tx {:url (:url ok)
+                                                         :canonical-url (:canonical-url ok)
+                                                         :domain (:domain ok)
+                                                         :title (:title manual)
+                                                         :currency (:currency manual)})
+                      snapshot (store/insert-price-snapshot! tx
+                                                             {:product-id (:id product)
+                                                              :price (:price manual)
+                                                              :currency (:currency manual)
+                                                              :source "manual-entry"
+                                                              :parser-version "manual-v1"
+                                                              :checked-at checked-at})]
+                  (store/update-last-checked! tx {:product-id (:id product)
+                                                  :checked-at checked-at})
+                  (responses/status-json
+                   201
+                   {:id (:id product)
+                    :title (:title product)
+                    :price (:price snapshot)
+                    :currency (:currency snapshot)
+                    :domain (:domain product)
+                    :lastCheckedAt (:checked_at snapshot)}))))
+            (catch Exception e
+              (if (= "23505" (sql-state e))
+                (responses/error-response 409 "already_exists" "Product already exists.")
+                (throw e)))))))))
 
 (defn list-products
   [ds]
@@ -191,7 +238,7 @@
         (responses/no-content)))))
 
 (defn refresh-product
-  [ds config]
+  [ds _config]
   (fn [req]
     (let [id (parse-uuid (get-in req [:path-params :id]))]
       (cond
@@ -200,38 +247,26 @@
 
         :else
         (if-let [product (store/get-product ds id)]
-          (let [target-url (or (:canonical_url product) (:url product))
-                {:keys [error]} (fetch/validate-url config target-url)]
-            (cond
-              error (fetch-error-response error)
-              :else
-              (let [normalized (or (fetch/normalize-url target-url) target-url)
-                    {:keys [error fetch-result]} (let [result (fetch/fetch-html config normalized)]
-                                                   {:error (:error result) :fetch-result (:ok result)})]
-                (if error
-                  (fetch-error-response error)
-                  (let [parsed (parser/parse-product parser/default-registry (:domain product) (:body fetch-result))
-                        parse-error (parse-product-error parsed {:require-title false})]
-                    (if parse-error
-                      (responses/error-response 422 (:type parse-error) (:message parse-error))
-                      (with-transaction
-                        ds
-                        (fn [tx]
-                          (let [checked-at (Instant/now)
-                                snapshot (store/insert-price-snapshot! tx
-                                                                       {:product-id (:id product)
-                                                                        :price (:price parsed)
-                                                                        :currency (:currency parsed)
-                                                                        :source "manual"
-                                                                        :raw-price-text (:raw-price-text parsed)
-                                                                        :parser-version (:parser-version parsed)
-                                                                        :availability (:availability parsed)
-                                                                        :checked-at checked-at})]
-                            (store/update-last-checked! tx {:product-id (:id product)
-                                                            :checked-at checked-at})
-                            (responses/json-response
-                             {:id (:id product)
-                              :price (:price snapshot)
-                              :currency (:currency snapshot)
-                              :lastCheckedAt (:checked_at snapshot)}))))))))))
+          (let [{:keys [ok error]} (parse-refresh-input (:json-body req))]
+            (if error
+              (responses/error-response 422 (:type error) (:message error))
+              (with-transaction
+                ds
+                (fn [tx]
+                  (let [checked-at (Instant/now)
+                        currency (or (:currency ok) (:currency product))
+                        snapshot (store/insert-price-snapshot! tx
+                                                               {:product-id (:id product)
+                                                                :price (:price ok)
+                                                                :currency currency
+                                                                :source "manual-refresh"
+                                                                :parser-version "manual-v1"
+                                                                :checked-at checked-at})]
+                    (store/update-last-checked! tx {:product-id (:id product)
+                                                    :checked-at checked-at})
+                    (responses/json-response
+                     {:id (:id product)
+                      :price (:price snapshot)
+                      :currency (:currency snapshot)
+                      :lastCheckedAt (:checked_at snapshot)}))))))
           (responses/error-response 404 "not_found" "Product not found."))))))
