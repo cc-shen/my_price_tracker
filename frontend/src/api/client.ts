@@ -8,7 +8,22 @@ const buildUrl = (path: string) => {
 };
 
 const defaultHeaders = {
-  "Content-Type": "application/json"
+  Accept: "application/json"
+};
+
+const buildHeaders = (options: RequestInit = {}) => {
+  const headers = new Headers(options.headers ?? {});
+  headers.set("Accept", defaultHeaders.Accept);
+
+  const hasBody = options.body !== undefined && options.body !== null;
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
+  if (hasBody && !headers.has("Content-Type") && !isFormData) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return headers;
 };
 
 export class ApiError extends Error {
@@ -50,7 +65,7 @@ const parseErrorResponse = async (response: Response) => {
 
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(buildUrl(path), {
-    headers: defaultHeaders
+    headers: buildHeaders()
   });
 
   if (!response.ok) {
@@ -67,10 +82,7 @@ export async function apiSend<T>(
 ): Promise<T> {
   const response = await fetch(buildUrl(path), {
     ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers
-    }
+    headers: buildHeaders(options)
   });
 
   if (!response.ok) {

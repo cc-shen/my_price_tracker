@@ -81,8 +81,9 @@
 (defn handler
   [config ds]
   (let [router (ring/router
-                (routes config ds))]
-    (-> (ring/ring-handler router)
+                (routes config ds))
+        default-handler (ring/create-default-handler)]
+    (-> (ring/ring-handler router default-handler)
         (params/wrap-params)
         (rate-limit/wrap-rate-limit {:limit-per-minute (get-in config [:fetch :rate-limit-per-minute])})
         (wrap-json-body)
