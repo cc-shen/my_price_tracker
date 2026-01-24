@@ -6,6 +6,13 @@
   [key default]
   (or (System/getenv key) default))
 
+(defn- env-str
+  [key default]
+  (let [raw (System/getenv key)]
+    (if (seq (str/trim (or raw "")))
+      raw
+      default)))
+
 (defn- env-int
   [key default]
   (let [raw (env key nil)]
@@ -24,6 +31,8 @@
 (defn load-config
   []
   (let [fetch-config {:rate-limit-per-minute (env-int "RATE_LIMIT_PER_MINUTE" 60)
+                      :timeout-ms (env-int "FETCH_TIMEOUT_MS" 8000)
+                      :user-agent (env-str "FETCH_USER_AGENT" "PriceTrackerBot/0.1 (+local-only)")
                       :allowed-domains (parse-origins (env "ALLOWED_DOMAINS" nil))
                       :denylist-path (env "DENYLIST_CONFIG" "resources/denylist.yml")}
         denylist (fetch/load-denylist {:fetch fetch-config})]

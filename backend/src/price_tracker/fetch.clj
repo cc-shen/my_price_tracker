@@ -11,8 +11,8 @@
     "gclid" "fbclid" "mc_cid" "mc_eid" "ref" "ref_" "tag" "affid"
     "affiliate" "irclickid" "irgwc" "scid"})
 
-(def ^:private fetch-timeout-ms 8000)
-(def ^:private user-agent "PriceTrackerBot/0.1 (+local-only)")
+(def ^:private default-fetch-timeout-ms 8000)
+(def ^:private default-user-agent "PriceTrackerBot/0.1 (+local-only)")
 (def ^:private rejected-statuses #{401 403 406 429 451})
 
 (def ^:private price-pattern
@@ -241,11 +241,13 @@
         (normalize-currency (re-find #"\b[A-Z]{3}\b" text)))))
 
 (defn- fetch-html
-  [url]
+  [config url]
   (try
-    (let [response (-> (Jsoup/connect url)
+    (let [timeout-ms (or (get-in config [:fetch :timeout-ms]) default-fetch-timeout-ms)
+          user-agent (or (get-in config [:fetch :user-agent]) default-user-agent)
+          response (-> (Jsoup/connect url)
                        (.userAgent user-agent)
-                       (.timeout fetch-timeout-ms)
+                       (.timeout timeout-ms)
                        (.followRedirects true)
                        (.ignoreHttpErrors true)
                        (.ignoreContentType true)
@@ -298,7 +300,7 @@
     {:error {:type "domain_not_supported"
              :message "Domain is not supported for parsing."
              :details {:domain host}}}
-    (let [{:keys [ok error]} (fetch-html url)]
+    (let [{:keys [ok error]} (fetch-html config url)]
       (if error
         {:error error}
         (parse-html (:body ok))))))
