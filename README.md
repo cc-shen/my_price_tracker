@@ -22,8 +22,11 @@ Note: the compose file defaults the backend `DATABASE_URL` to the `db` service h
 locally (outside Docker), update `DATABASE_URL` in `.env` to use `localhost`.
 
 ## Adding products
-Use the Add Product modal and enter the title + price manually for each URL. The app does not
-perform automatic scraping.
+Use the Add Product modal. **Fetch details** attempts a one-time preview for supported domains only
+and may be blocked for responsible crawling. Manual entry is always required to save a product.
+
+## Timezones
+All timestamps are stored and returned in UTC; the UI displays times in Eastern Time (EST/EDT).
 
 ## Make targets
 ```sh

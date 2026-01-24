@@ -20,7 +20,13 @@ Backend:
 - PORT
 - LOG_LEVEL
 - ALLOWED_DOMAINS
+- DENYLIST_CONFIG
 - RATE_LIMIT_PER_MINUTE
 
 Frontend:
 - API_BASE_URL
+
+## Time semantics
+- All persisted timestamps are UTC (timestamptz).
+- UI displays timestamps in Eastern Time (America/New_York) with DST handling.
+- Price snapshots are unique per product per UTC day (same-day overwrites).

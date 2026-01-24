@@ -1,10 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
-import { apiSend } from "../api/client";
+import { ApiError, apiSend } from "../api/client";
 import Modal from "./modal";
 import { useToast } from "./toast-provider";
 
+type PreviewProductResponse = {
+  url?: string;
+  domain: string;
+  title?: string;
+  price: number;
+  currency?: string;
+  parserVersion?: string;
+  rawPriceText?: string;
+};
+
 type CreateProductResponse = {
   id: string;
+  url?: string;
   title: string;
   price: number;
   currency?: string;
@@ -23,27 +34,88 @@ export default function AddProductModal({
   onClose,
   onCreated
 }: AddProductModalProps) {
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [url, setUrl] = useState("");
   const [manualTitle, setManualTitle] = useState("");
   const [manualPrice, setManualPrice] = useState("");
   const [manualCurrency, setManualCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingPreview, setIsFetchingPreview] = useState(false);
   const { pushToast } = useToast();
 
   useEffect(() => {
     if (!isOpen) {
+      setMode("auto");
       setUrl("");
       setManualTitle("");
       setManualPrice("");
       setManualCurrency("");
       setError(null);
       setIsSubmitting(false);
+      setIsFetchingPreview(false);
     }
   }, [isOpen]);
 
+  const handlePreview = async () => {
+    if (!url.trim()) {
+      setError("Please enter a product URL.");
+      return;
+    }
+
+    setIsFetchingPreview(true);
+    setError(null);
+
+    try {
+      const payload = await apiSend<PreviewProductResponse>(
+        "/api/products/preview",
+        {
+          method: "POST",
+          body: JSON.stringify({ url: url.trim() })
+        }
+      );
+      const priceValue = Number.parseFloat(String(payload.price));
+      const normalizedPrice = Number.isFinite(priceValue)
+        ? priceValue.toFixed(2)
+        : "";
+      setUrl(payload.url ?? url.trim());
+      setManualTitle(payload.title ?? "");
+      setManualPrice(normalizedPrice);
+      setManualCurrency(payload.currency ?? "");
+      setMode("manual");
+      setError(
+        payload.title
+          ? null
+          : "We found a price but not a title. Please add the product name."
+      );
+      pushToast({
+        message: "Fetched details. Review and confirm before saving.",
+        tone: "success"
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to fetch details.";
+      setError(message);
+      setMode("manual");
+      if (err instanceof ApiError && err.type === "fetch_rejected") {
+        pushToast({
+          message: "This site rejected the request. Enter details manually.",
+          tone: "error"
+        });
+      } else {
+        pushToast({ message, tone: "error" });
+      }
+    } finally {
+      setIsFetchingPreview(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (mode !== "manual") {
+      await handlePreview();
+      return;
+    }
     if (!url.trim()) {
       setError("Please enter a product URL.");
       return;
@@ -83,7 +155,10 @@ export default function AddProductModal({
       if (!payload) {
         throw new Error("No response returned.");
       }
-      onCreated(payload);
+      onCreated({
+        ...payload,
+        url: payload.url ?? url.trim()
+      });
       pushToast({
         message: "Product added. Tracking starts now.",
         tone: "success"
@@ -111,41 +186,50 @@ export default function AddProductModal({
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
           />
         </label>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
-            Product title
-            <input
-              type="text"
-              value={manualTitle}
-              onChange={(event) => setManualTitle(event.target.value)}
-              placeholder="Blue Light Blocking Glasses"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-            Price
-            <input
-              type="number"
-              value={manualPrice}
-              onChange={(event) => setManualPrice(event.target.value)}
-              placeholder="19.99"
-              step="0.01"
-              min="0"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-            Currency (optional)
-            <input
-              type="text"
-              value={manualCurrency}
-              onChange={(event) => setManualCurrency(event.target.value)}
-              placeholder="CAD"
-              maxLength={3}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
-            />
-          </label>
-        </div>
+        {mode === "auto" ? (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-600">
+              We can try to fetch the title and price once. If it fails, you can
+              enter the details manually.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
+              Product title
+              <input
+                type="text"
+                value={manualTitle}
+                onChange={(event) => setManualTitle(event.target.value)}
+                placeholder="Blue Light Blocking Glasses"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+              Price
+              <input
+                type="number"
+                value={manualPrice}
+                onChange={(event) => setManualPrice(event.target.value)}
+                placeholder="19.99"
+                step="0.01"
+                min="0"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+              Currency (optional)
+              <input
+                type="text"
+                value={manualCurrency}
+                onChange={(event) => setManualCurrency(event.target.value)}
+                placeholder="CAD"
+                maxLength={3}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+              />
+            </label>
+          </div>
+        )}
         {error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {error}
@@ -155,17 +239,40 @@ export default function AddProductModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? "Adding..." : "Add product"}
-          </button>
+          {mode === "auto" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("manual");
+                  setError(null);
+                }}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              >
+                Enter manually
+              </button>
+              <button
+                type="button"
+                onClick={handlePreview}
+                disabled={isFetchingPreview}
+                className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isFetchingPreview ? "Fetching..." : "Fetch details"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSubmitting ? "Adding..." : "Add product"}
+            </button>
+          )}
         </div>
       </form>
     </Modal>

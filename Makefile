@@ -20,8 +20,8 @@ frontend-lint:
 frontend-test:
 	cd frontend && if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then yarn run test; else echo "frontend: no test script defined, skipping"; fi
 
-backend-dev:
-	cd backend && clojure -M:dev
+backend-dev: backend-setup
+	cd backend && clojure -M:dev -m price-tracker.main
 
 backend-setup:
 	@if [ -n "$$DATABASE_URL" ]; then echo "backend: running migrations"; $(MAKE) migrate; else echo "backend: DATABASE_URL not set; skipping migrations"; fi

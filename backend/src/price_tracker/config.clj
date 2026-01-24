@@ -1,5 +1,6 @@
 (ns price-tracker.config
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [price-tracker.fetch :as fetch]))
 
 (defn- env
   [key default]
@@ -22,10 +23,13 @@
 
 (defn load-config
   []
-  {:http {:host (env "HOST" "127.0.0.1")
-          :port (env-int "PORT" 3000)}
-   :db {:database-url (env "DATABASE_URL" nil)}
-   :logging {:level (env "LOG_LEVEL" "info")}
-   :fetch {:rate-limit-per-minute (env-int "RATE_LIMIT_PER_MINUTE" 60)
-           :allowed-domains (parse-origins (env "ALLOWED_DOMAINS" nil))}
-   :cors {:allowed-origins (parse-origins (env "CORS_ALLOWED_ORIGINS" nil))}})
+  (let [fetch-config {:rate-limit-per-minute (env-int "RATE_LIMIT_PER_MINUTE" 60)
+                      :allowed-domains (parse-origins (env "ALLOWED_DOMAINS" nil))
+                      :denylist-path (env "DENYLIST_CONFIG" "resources/denylist.yml")}
+        denylist (fetch/load-denylist {:fetch fetch-config})]
+    {:http {:host (env "HOST" "127.0.0.1")
+            :port (env-int "PORT" 3000)}
+     :db {:database-url (env "DATABASE_URL" nil)}
+     :logging {:level (env "LOG_LEVEL" "info")}
+     :fetch (assoc fetch-config :denylist denylist)
+     :cors {:allowed-origins (parse-origins (env "CORS_ALLOWED_ORIGINS" nil))}}))

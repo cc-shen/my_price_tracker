@@ -57,14 +57,14 @@
   [["/health" {:get health-handler}]
    ["/api/products"
     {:get (api/list-products ds)
-     :post (api/create-product ds config)}]
-   ["/api/products/:id"
-    {:get (api/get-product ds)
-     :delete (api/delete-product ds)}]
-   ["/api/products/:id/prices"
-    {:get (api/get-price-history ds)}]
-   ["/api/products/:id/refresh"
-    {:post (api/refresh-product ds config)}]])
+     :post (api/create-product ds config)}
+    ["/preview" {:post (api/preview-product config)}]
+    ["/:id"
+     {:get (api/get-product ds)
+      :delete (api/delete-product ds)}
+     ["/prices" {:get (api/get-price-history ds)}]
+     ["/refresh" {:post (api/refresh-product ds config)}]
+     ["/fetch" {:post (api/fetch-product ds config)}]]]])
 
 (defn- wrap-cors-if-needed
   [handler {:keys [allowed-origins]}]

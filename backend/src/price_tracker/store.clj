@@ -8,6 +8,22 @@
     (java.sql.Timestamp/from ^java.time.Instant value)
     value))
 
+(defn- ->local-date
+  [value]
+  (cond
+    (instance? java.time.LocalDate value)
+    (java.sql.Date/valueOf ^java.time.LocalDate value)
+
+    (instance? java.time.Instant value)
+    (let [zone java.time.ZoneOffset/UTC
+          local-date (-> (java.time.ZonedDateTime/ofInstant ^java.time.Instant value zone)
+                         (.toLocalDate))]
+      (java.sql.Date/valueOf local-date))
+
+    (nil? value) nil
+
+    :else value))
+
 (defn create-product!
   [ds {:keys [url canonical-url domain title currency]}]
   (db/execute-one
@@ -34,6 +50,7 @@
   (db/query
    ds
    ["SELECT p.id,
+            p.url,
             p.title,
             p.domain,
             p.currency,
@@ -51,13 +68,23 @@
      ORDER BY p.updated_at DESC"]))
 
 (defn insert-price-snapshot!
-  [ds {:keys [product-id price currency source raw-price-text parser-version availability checked-at]}]
-  (db/execute-one
-   ds
-   ["INSERT INTO price_snapshots (product_id, price, currency, source, raw_price_text, parser_version, availability, checked_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     RETURNING *"
-    product-id price currency source raw-price-text parser-version availability (->timestamp checked-at)]))
+  [ds {:keys [product-id price currency source raw-price-text parser-version availability checked-at checked-on]}]
+  (let [checked-at (or checked-at (java.time.Instant/now))
+        checked-on (or checked-on (->local-date checked-at))]
+    (db/execute-one
+     ds
+     ["INSERT INTO price_snapshots (product_id, price, currency, source, raw_price_text, parser_version, availability, checked_at, checked_on)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (product_id, checked_on)
+       DO UPDATE SET price = EXCLUDED.price,
+                     currency = EXCLUDED.currency,
+                     source = EXCLUDED.source,
+                     raw_price_text = EXCLUDED.raw_price_text,
+                     parser_version = EXCLUDED.parser_version,
+                     availability = EXCLUDED.availability,
+                     checked_at = EXCLUDED.checked_at
+       RETURNING *"
+      product-id price currency source raw-price-text parser-version availability (->timestamp checked-at) (->local-date checked-on)])))
 
 (defn update-last-checked!
   [ds {:keys [product-id checked-at]}]

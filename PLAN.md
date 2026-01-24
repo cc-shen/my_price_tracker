@@ -54,7 +54,7 @@
   - [x] Insert product + initial snapshot
 - [x] Manual refresh:
   - [x] Accept manual price input
-  - [x] Append snapshot
+  - [x] Overwrite same-day snapshot (UTC)
 - [x] Delete product:
   - [x] Confirmed delete
   - [x] Cascade snapshots
