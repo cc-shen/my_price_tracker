@@ -89,6 +89,35 @@
           (is (= 200 (:status resp)))
           (is (= 8.00M (-> body first :currentPrice))))))))
 
+(deftest insert-price-snapshot-upserts-by-day
+  (with-db
+    (fn []
+      (let [product (store/create-product! *ds* {:url "https://example.com/item"
+                                                 :canonical-url "https://example.com/item"
+                                                 :domain "example.com"
+                                                 :title "Item"
+                                                 :currency "USD"})
+            zone (java.time.ZoneId/systemDefault)
+            t1 (-> (java.time.ZonedDateTime/of 2024 1 1 10 0 0 0 zone)
+                   (.toInstant))
+            t2 (-> (java.time.ZonedDateTime/of 2024 1 1 15 0 0 0 zone)
+                   (.toInstant))]
+        (store/insert-price-snapshot! *ds* {:product-id (:id product)
+                                            :price 10.00M
+                                            :currency "USD"
+                                            :source "manual"
+                                            :checked-at t1})
+        (store/insert-price-snapshot! *ds* {:product-id (:id product)
+                                            :price 9.00M
+                                            :currency "USD"
+                                            :source "manual"
+                                            :checked-at t2})
+        (is (= 1 (count-for-product "price_snapshots" (:id product))))
+        (let [row (db/execute-one *ds*
+                                  ["SELECT price FROM price_snapshots WHERE product_id = ?"
+                                   (:id product)])]
+          (is (= 9.00M (:price row))))))))
+
 (deftest get-price-history-filters-range
   (with-db
     (fn []

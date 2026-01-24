@@ -11,7 +11,8 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 
 ### 1.2 Goals
 - Track products from multiple websites (Amazon, Lululemon, Aritzia, Jimmy Choo, etc.).
-- Manually enter product title and price (no automatic scraping).
+- Manually enter product title and price for every product.
+- Allow an optional, user-initiated **preview fetch** to prefill title/price on supported domains only (responsible crawling; not guaranteed).
 - Display:
   - “All tracked items” overview page
   - Individual product detail page with **price history chart**
@@ -27,6 +28,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Browser extension integration
 - Full internationalization (multi-language)
 - Complex anti-bot bypass / CAPTCHA solving
+- Automated scheduled scraping or background crawling
 - Public hosting or internet-exposed services
 
 
@@ -58,7 +60,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - On submission:
   - Validate URL format
   - Normalize URL (strip tracking parameters if possible)
-  - Require manual metadata entry:
+  - Require manual metadata entry (always required, even if a preview fetch is available):
     - `title`
     - `price` (numeric)
     - `currency` (e.g., CAD/USD; optional)
@@ -68,6 +70,19 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 **Acceptance Criteria:**
 - If manual entry succeeds, product appears in the dashboard immediately.
 - If validation fails, show a helpful error (e.g., “title and price are required”).
+
+#### FR-1b: Preview product details (limited automatic fetch)
+**User story:** As a user, I want to preview a product’s title and price so I can save time when adding it.
+
+**Requirements:**
+- Preview fetch is **user-initiated** and runs once per action (no background scraping).
+- Only works for a subset of domains; unsupported or blocked domains must fail gracefully.
+- Returned data is **advisory**; user must review and confirm manual fields before saving.
+- Respect responsible crawling practices (rate limits, denylist, no anti-bot bypass).
+
+**Acceptance Criteria:**
+- If parsing succeeds, the modal is prefilled with title/price for review.
+- If parsing fails or the domain is blocked, the UI clearly instructs manual entry.
 
 #### FR-2: Support multiple retailer domains
 **Requirements:**
@@ -87,10 +102,11 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
   - price
   - currency
   - optional metadata (entry source, entry version)
+  - one snapshot per product per **UTC day** (same-day updates overwrite)
 
 **Acceptance Criteria:**
 - At minimum, adding a product creates 1 data point.
-- System supports repeated snapshot insertions later.
+- System supports repeated snapshot insertions across days.
 
 #### FR-4: Display price history graph
 **User story:** As a user, I want to see a graph of a product’s price changes over time.
@@ -155,17 +171,27 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Confirm deletes and removes from UI immediately after success.
 
 
-### 3.5 Data Fetching Behavior (MVP vs Next Step)
+### 3.5 Data Fetching Behavior (Manual + Limited Preview)
 
 #### FR-8: Manual refresh (MVP)
 **Requirements:**
 - Provide a “Refresh price” button per product or on dashboard.
 - On refresh:
   - user enters the latest price (and optional currency)
-  - append new price point
+  - overwrite the existing snapshot for the same **UTC day**, or create a new one if none exists
 
 **Acceptance Criteria:**
-- Refresh adds a new record with a new timestamp.
+- Refresh overwrites today’s record in UTC (if present) and updates the timestamp.
+
+#### FR-9: One-off fetch for tracked products (limited)
+**Requirements:**
+- Provide a “Fetch” action that attempts a one-time parse of the tracked product URL.
+- Only works for supported domains; failures should instruct manual update.
+- Uses the same same-day overwrite rule as manual refresh (UTC day).
+
+**Acceptance Criteria:**
+- If parsing succeeds, the latest price is stored and the UI updates.
+- If parsing fails, the user is prompted to enter a manual update.
 
 
 ## 4) Non-Functional Requirements
@@ -175,9 +201,10 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Price history graph query should return in < 300ms for typical ranges.
 
 ### 4.2 Reliability & Data Integrity
-- Price records are append-only (no overwrites).
+- Price records are append-only across days; the system stores at most one snapshot per product per **UTC day** (same-day overwrites).
 - Deleting product removes all dependent data (cascading delete).
 - DB schema supports migration versioning.
+- All timestamps are stored and returned in UTC (ISO-8601).
 
 ### 4.3 Security (Important)
 **Key requirements:**
@@ -195,7 +222,10 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Logging:
   - Never log sensitive headers/cookies
 
-### 4.4 Maintainability / Extensibility
+### 4.4 Time Display
+- UI must display timestamps in Eastern Time (America/New_York) with DST handling (EST/EDT).
+
+### 4.5 Maintainability / Extensibility
 - Clear separation between:
   - persistence layer
   - API layer
@@ -227,7 +257,8 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 ### 5.2 Backend (Clojure)
 **Responsibilities**
 - REST API for CRUD and querying price history
-- Manual product entry and price updates (no scraping)
+- Manual product entry and price updates
+- Optional user-initiated preview/fetch for supported domains (no background scraping)
 
 **Suggested libraries**
 - Ring + Reitit for routing
@@ -258,14 +289,39 @@ Recommended for persistence and efficient time-series queries.
 - `price` (numeric(12,2))
 - `currency` (text)
 - `checked_at` (timestamptz)
+- `checked_on` (date, UTC)
 - `source` (text, e.g., “manual-entry”, “manual-refresh”)
 - `raw_price_text` (text, optional for debugging)
+- Unique: `(product_id, checked_on)`
 - Index: `(product_id, checked_at desc)`
 
 
 ## 6) API Requirements (REST)
 
-### 6.1 Add product
+All timestamp fields in API responses must be ISO-8601 UTC strings.
+
+### 6.1 Preview product details (limited)
+`POST /api/products/preview`
+```json
+{
+  "url": "https://..."
+}
+```
+
+Response (best effort):
+```json
+{
+  "url": "https://...",
+  "domain": "example.com",
+  "title": "Product name",
+  "price": 123.45,
+  "currency": "CAD",
+  "parserVersion": "auto-meta-v1",
+  "rawPriceText": "$123.45"
+}
+```
+
+### 6.2 Add product
 `POST /api/products`
 ```json
 {
@@ -290,7 +346,7 @@ Response:
 }
 ```
 
-### 6.2 List products
+### 6.3 List products
 `GET /api/products`
 
 Response:
@@ -307,10 +363,10 @@ Response:
 ]
 ```
 
-### 6.3 Get single product
+### 6.4 Get single product
 `GET /api/products/:id`
 
-### 6.4 Get price history (with range filters)
+### 6.5 Get price history (with range filters)
 `GET /api/products/:id/prices?from=2025-01-01&to=2026-01-20`
 
 Response:
@@ -324,7 +380,7 @@ Response:
 }
 ```
 
-### 6.5 Refresh price manually
+### 6.6 Refresh price manually
 `POST /api/products/:id/refresh`
 ```json
 {
@@ -333,7 +389,10 @@ Response:
 }
 ```
 
-### 6.6 Delete product
+### 6.7 Fetch latest price (limited)
+`POST /api/products/:id/fetch`
+
+### 6.8 Delete product
 `DELETE /api/products/:id`
 
 
@@ -352,6 +411,7 @@ Backend:
 - `PORT`
 - `LOG_LEVEL`
 - `ALLOWED_DOMAINS` (optional allowlist)
+- `DENYLIST_CONFIG` (optional denylist path)
 - `RATE_LIMIT_PER_MINUTE`
 
 Frontend:
@@ -392,11 +452,12 @@ Log important events:
 **Must-have (MVP)**
 - Add product by URL
 - Manual entry of title + price
+- Preview fetch for supported domains (optional, user-initiated)
 - Dashboard list view
 - Product detail view with history chart
 - Date range presets
 - Delete with confirmation
-- Manual refresh
+- Manual refresh (same-day overwrite)
 - Dockerized deployment with Postgres
 
 **Nice-to-have (v1.1)**
@@ -415,5 +476,6 @@ Log important events:
 ## 12) Edge Cases & Error Handling
 - Invalid URL format
 - Price not found / currency missing
+- Preview fetch unsupported or blocked domains
 - Duplicate product URL added again (reject or de-dupe)
 - Variant-specific pricing (size/color changes price)

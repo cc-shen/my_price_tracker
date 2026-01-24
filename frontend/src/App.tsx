@@ -5,7 +5,7 @@ import { ToastProvider } from "./components/toast-provider";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    "rounded-full px-4 py-2 text-sm font-semibold tracking-wide",
+    "rounded-full px-4 py-2 text-sm font-semibold tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f4ef]",
     isActive
       ? "bg-amber-400 text-slate-900 shadow-sm"
       : "text-slate-700 hover:bg-amber-100"
@@ -30,9 +30,6 @@ export default function App() {
                 <NavLink to="/" className={navLinkClass} end>
                   Dashboard
                 </NavLink>
-                <NavLink to="/products/preview" className={navLinkClass}>
-                  Product Detail
-                </NavLink>
               </nav>
             </header>
             <main className="mt-10 flex-1">
@@ -41,7 +38,7 @@ export default function App() {
                 <Route path="/products/:id" element={<ProductDetail />} />
               </Routes>
             </main>
-            <footer className="mt-16 text-xs uppercase tracking-[0.3em] text-slate-500">
+            <footer className="mt-16 text-xs uppercase tracking-[0.3em] text-slate-600">
               Local-only build. Data stays on your machine.
             </footer>
           </div>

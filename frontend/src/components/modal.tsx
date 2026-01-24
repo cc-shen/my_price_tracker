@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useId } from "react";
 
 type ModalProps = {
   title: string;
@@ -8,6 +8,8 @@ type ModalProps = {
 };
 
 export default function Modal({ title, isOpen, onClose, children }: ModalProps) {
+  const titleId = useId();
+
   if (!isOpen) {
     return null;
   }
@@ -19,13 +21,20 @@ export default function Modal({ title, isOpen, onClose, children }: ModalProps) 
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative w-full max-w-xl rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.2)] animate-fade-in">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-xl rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.2)] animate-fade-in"
+      >
         <div className="flex items-start justify-between gap-4">
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-slate-900">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
             Close
           </button>

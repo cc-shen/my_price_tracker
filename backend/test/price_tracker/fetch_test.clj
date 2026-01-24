@@ -27,3 +27,13 @@
          (fetch/normalize-url "https://example.com/product?utm_source=x&color=red&fbclid=abc")))
   (is (= "https://example.com/"
          (fetch/normalize-url "https://example.com#section"))))
+
+(deftest load-denylist-yaml
+  (let [file (java.io.File/createTempFile "denylist" ".yml")]
+    (try
+      (spit file "denylist:\n  - amazon.ca\n  - Example.com\n")
+      (let [config {:fetch {:denylist-path (.getAbsolutePath file)}}
+            denylist (fetch/load-denylist config)]
+        (is (= ["amazon.ca" "example.com"] denylist)))
+      (finally
+        (.delete file)))))

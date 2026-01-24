@@ -1,16 +1,30 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import AddProductModal from "../src/components/add-product-modal";
 import { ToastProvider } from "../src/components/toast-provider";
 import { apiSend } from "../src/api/client";
 
-vi.mock("../src/api/client", () => ({
-  apiSend: vi.fn()
-}));
+vi.mock("../src/api/client", () => {
+  class ApiError extends Error {
+    type?: string;
+    constructor(message?: string) {
+      super(message);
+      this.name = "ApiError";
+    }
+  }
+  return {
+    apiSend: vi.fn(),
+    ApiError
+  };
+});
 
 describe("AddProductModal", () => {
-  it("validates the URL before submitting", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("validates the URL before fetching", async () => {
     const onCreated = vi.fn();
     const onClose = vi.fn();
 
@@ -20,16 +34,23 @@ describe("AddProductModal", () => {
       </ToastProvider>
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fetch details" }));
 
     expect(screen.getByText("Please enter a product URL.")).toBeInTheDocument();
     expect(apiSend).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("submits a URL and reports success", async () => {
+  it("fetches details then submits a product", async () => {
     const onCreated = vi.fn();
     const onClose = vi.fn();
+    const previewPayload = {
+      url: "https://example.com/product",
+      domain: "example.com",
+      title: "Test item",
+      price: 19.99,
+      currency: "USD"
+    };
     const payload = {
       id: "123",
       title: "Test item",
@@ -39,7 +60,7 @@ describe("AddProductModal", () => {
       lastCheckedAt: "2024-01-01T00:00:00Z"
     };
 
-    vi.mocked(apiSend).mockResolvedValueOnce(payload);
+    vi.mocked(apiSend).mockResolvedValueOnce(previewPayload).mockResolvedValueOnce(payload);
 
     render(
       <ToastProvider>
@@ -51,17 +72,32 @@ describe("AddProductModal", () => {
       screen.getByLabelText("Product URL"),
       "https://example.com/product"
     );
-    await userEvent.type(screen.getByLabelText("Product title"), "Test item");
-    await userEvent.type(screen.getByLabelText("Price"), "19.99");
-    await userEvent.type(screen.getByLabelText("Currency (optional)"), "usd");
+    await userEvent.click(screen.getByRole("button", { name: "Fetch details" }));
+
+    expect(await screen.findByLabelText("Product title")).toHaveValue("Test item");
+    expect(screen.getByLabelText("Price")).toHaveValue(19.99);
+    expect(screen.getByLabelText("Currency (optional)")).toHaveValue("USD");
+
     await userEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     await waitFor(() => {
-      expect(onCreated).toHaveBeenCalledWith(payload);
+      expect(onCreated).toHaveBeenCalledWith({
+        ...payload,
+        url: "https://example.com/product"
+      });
       expect(onClose).toHaveBeenCalled();
     });
 
-    expect(apiSend).toHaveBeenCalledWith(
+    expect(apiSend).toHaveBeenNthCalledWith(
+      1,
+      "/api/products/preview",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com/product" })
+      })
+    );
+    expect(apiSend).toHaveBeenNthCalledWith(
+      2,
       "/api/products",
       expect.objectContaining({
         method: "POST",
@@ -90,6 +126,7 @@ describe("AddProductModal", () => {
       </ToastProvider>
     );
 
+    await userEvent.click(screen.getByRole("button", { name: "Enter manually" }));
     await userEvent.type(
       screen.getByLabelText("Product URL"),
       "https://example.com/product"

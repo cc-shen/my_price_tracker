@@ -43,7 +43,7 @@
                          (map :column_name)
                          set)
             expected #{"id" "product_id" "price" "currency" "checked_at"
-                       "source" "raw_price_text" "parser_version" "availability"}]
+                       "checked_on" "source" "raw_price_text" "parser_version" "availability"}]
         (doseq [col expected]
           (is (contains? columns col)))))))
 
@@ -54,7 +54,8 @@
                                    ["SELECT indexname FROM pg_indexes WHERE tablename = 'price_snapshots'"])
                          (map :indexname)
                          set)]
-        (is (contains? indexes "price_snapshots_product_id_checked_at_idx"))))))
+        (is (contains? indexes "price_snapshots_product_id_checked_at_idx"))
+        (is (contains? indexes "price_snapshots_product_id_checked_on_key"))))))
 
 (deftest price-snapshots-cascade-delete
   (with-db
