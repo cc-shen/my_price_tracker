@@ -12,7 +12,6 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 ### 1.2 Goals
 - Track products from multiple websites (Amazon, Lululemon, Aritzia, Jimmy Choo, etc.).
 - Manually enter product title and price for every product.
-- Allow an optional, user-initiated **preview fetch** to prefill title/price on supported domains only (responsible crawling; not guaranteed).
 - Display:
   - “All tracked items” overview page
   - Individual product detail page with **price history chart**
@@ -60,7 +59,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - On submission:
   - Validate URL format
   - Normalize URL (strip tracking parameters if possible)
-  - Require manual metadata entry (always required, even if a preview fetch is available):
+  - Require manual metadata entry:
     - `title`
     - `price` (numeric)
     - `currency` (e.g., CAD/USD; optional)
@@ -70,19 +69,6 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 **Acceptance Criteria:**
 - If manual entry succeeds, product appears in the dashboard immediately.
 - If validation fails, show a helpful error (e.g., “title and price are required”).
-
-#### FR-1b: Preview product details (limited automatic fetch)
-**User story:** As a user, I want to preview a product’s title and price so I can save time when adding it.
-
-**Requirements:**
-- Preview fetch is **user-initiated** and runs once per action (no background scraping).
-- Only works for a subset of domains; unsupported or blocked domains must fail gracefully.
-- Returned data is **advisory**; user must review and confirm manual fields before saving.
-- Respect responsible crawling practices (rate limits, denylist, no anti-bot bypass).
-
-**Acceptance Criteria:**
-- If parsing succeeds, the modal is prefilled with title/price for review.
-- If parsing fails or the domain is blocked, the UI clearly instructs manual entry.
 
 #### FR-2: Support multiple retailer domains
 **Requirements:**
@@ -258,7 +244,7 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 **Responsibilities**
 - REST API for CRUD and querying price history
 - Manual product entry and price updates
-- Optional user-initiated preview/fetch for supported domains (no background scraping)
+- Optional user-initiated fetch for supported domains (no background scraping)
 
 **Suggested libraries**
 - Ring + Reitit for routing
@@ -300,28 +286,7 @@ Recommended for persistence and efficient time-series queries.
 
 All timestamp fields in API responses must be ISO-8601 UTC strings.
 
-### 6.1 Preview product details (limited)
-`POST /api/products/preview`
-```json
-{
-  "url": "https://..."
-}
-```
-
-Response (best effort):
-```json
-{
-  "url": "https://...",
-  "domain": "example.com",
-  "title": "Product name",
-  "price": 123.45,
-  "currency": "CAD",
-  "parserVersion": "auto-meta-v1",
-  "rawPriceText": "$123.45"
-}
-```
-
-### 6.2 Add product
+### 6.1 Add product
 `POST /api/products`
 ```json
 {
@@ -346,7 +311,7 @@ Response:
 }
 ```
 
-### 6.3 List products
+### 6.2 List products
 `GET /api/products`
 
 Response:
@@ -363,10 +328,10 @@ Response:
 ]
 ```
 
-### 6.4 Get single product
+### 6.3 Get single product
 `GET /api/products/:id`
 
-### 6.5 Get price history (with range filters)
+### 6.4 Get price history (with range filters)
 `GET /api/products/:id/prices?from=2025-01-01&to=2026-01-20`
 
 Response:
@@ -380,7 +345,7 @@ Response:
 }
 ```
 
-### 6.6 Refresh price manually
+### 6.5 Refresh price manually
 `POST /api/products/:id/refresh`
 ```json
 {
@@ -389,10 +354,10 @@ Response:
 }
 ```
 
-### 6.7 Fetch latest price (limited)
+### 6.6 Fetch latest price (limited)
 `POST /api/products/:id/fetch`
 
-### 6.8 Delete product
+### 6.7 Delete product
 `DELETE /api/products/:id`
 
 
@@ -452,7 +417,6 @@ Log important events:
 **Must-have (MVP)**
 - Add product by URL
 - Manual entry of title + price
-- Preview fetch for supported domains (optional, user-initiated)
 - Dashboard list view
 - Product detail view with history chart
 - Date range presets
@@ -476,6 +440,5 @@ Log important events:
 ## 12) Edge Cases & Error Handling
 - Invalid URL format
 - Price not found / currency missing
-- Preview fetch unsupported or blocked domains
 - Duplicate product URL added again (reject or de-dupe)
 - Variant-specific pricing (size/color changes price)

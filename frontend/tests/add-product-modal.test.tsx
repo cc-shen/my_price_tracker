@@ -24,7 +24,7 @@ describe("AddProductModal", () => {
     vi.clearAllMocks();
   });
 
-  it("validates the URL before fetching", async () => {
+  it("validates the URL before submitting", async () => {
     const onCreated = vi.fn();
     const onClose = vi.fn();
 
@@ -34,23 +34,16 @@ describe("AddProductModal", () => {
       </ToastProvider>
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Fetch details" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     expect(screen.getByText("Please enter a product URL.")).toBeInTheDocument();
     expect(apiSend).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("fetches details then submits a product", async () => {
+  it("submits a product", async () => {
     const onCreated = vi.fn();
     const onClose = vi.fn();
-    const previewPayload = {
-      url: "https://example.com/product",
-      domain: "example.com",
-      title: "Test item",
-      price: 19.99,
-      currency: "USD"
-    };
     const payload = {
       id: "123",
       title: "Test item",
@@ -60,7 +53,7 @@ describe("AddProductModal", () => {
       lastCheckedAt: "2024-01-01T00:00:00Z"
     };
 
-    vi.mocked(apiSend).mockResolvedValueOnce(previewPayload).mockResolvedValueOnce(payload);
+    vi.mocked(apiSend).mockResolvedValueOnce(payload);
 
     render(
       <ToastProvider>
@@ -72,11 +65,9 @@ describe("AddProductModal", () => {
       screen.getByLabelText("Product URL"),
       "https://example.com/product"
     );
-    await userEvent.click(screen.getByRole("button", { name: "Fetch details" }));
-
-    expect(await screen.findByLabelText("Product title")).toHaveValue("Test item");
-    expect(screen.getByLabelText("Price")).toHaveValue(19.99);
-    expect(screen.getByLabelText("Currency (optional)")).toHaveValue("USD");
+    await userEvent.type(screen.getByLabelText("Product title"), "Test item");
+    await userEvent.type(screen.getByLabelText("Price"), "19.99");
+    await userEvent.type(screen.getByLabelText("Currency (optional)"), "USD");
 
     await userEvent.click(screen.getByRole("button", { name: "Add product" }));
 
@@ -88,16 +79,7 @@ describe("AddProductModal", () => {
       expect(onClose).toHaveBeenCalled();
     });
 
-    expect(apiSend).toHaveBeenNthCalledWith(
-      1,
-      "/api/products/preview",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ url: "https://example.com/product" })
-      })
-    );
-    expect(apiSend).toHaveBeenNthCalledWith(
-      2,
+    expect(apiSend).toHaveBeenCalledWith(
       "/api/products",
       expect.objectContaining({
         method: "POST",
@@ -126,7 +108,6 @@ describe("AddProductModal", () => {
       </ToastProvider>
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Enter manually" }));
     await userEvent.type(
       screen.getByLabelText("Product URL"),
       "https://example.com/product"

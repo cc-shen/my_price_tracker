@@ -81,35 +81,6 @@
         (is (= 409 (:status resp)))
         (is (= "already_exists" (get-in (parse-body resp) [:error :type])))))))
 
-(deftest preview-product-success
-  (let [config {:fetch {}}
-        handler (api/preview-product config)]
-    (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
-                  fetch/normalize-url (fn [_] "https://example.com/item")
-                  fetch/fetch-product-details (fn [_ _] {:ok {:title "Parsed Item"
-                                                              :price 15.25M
-                                                              :currency "USD"
-                                                              :parser-version "auto-meta-v1"
-                                                              :raw-price-text "$15.25"}})]
-      (let [resp (handler {:json-body {:url "https://example.com/item"}})
-            body (parse-body resp)]
-        (is (= 200 (:status resp)))
-        (is (= "https://example.com/item" (:url body)))
-        (is (= "example.com" (:domain body)))
-        (is (= "Parsed Item" (:title body)))
-        (is (== 15.25M (:price body)))))))
-
-(deftest preview-product-domain-not-supported
-  (let [config {:fetch {}}
-        handler (api/preview-product config)]
-    (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
-                  fetch/normalize-url (fn [_] "https://example.com/item")
-                  fetch/fetch-product-details (fn [_ _] {:error {:type "domain_not_supported"
-                                                                :message "Domain is not supported."}})]
-      (let [resp (handler {:json-body {:url "https://example.com/item"}})]
-        (is (= 422 (:status resp)))
-        (is (= "domain_not_supported" (get-in (parse-body resp) [:error :type])))))))
-
 (deftest list-products-mapping
   (with-redefs [store/list-products (fn [_]
                                       [{:id "1"

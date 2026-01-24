@@ -31,7 +31,6 @@ DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
 
 ## API notes
 `POST /api/products` requires a manual payload with `title` and `price`.
-`POST /api/products/preview` can attempt to fetch and parse title/price once for a URL.
 `POST /api/products/:id/fetch` attempts a one-off price fetch for a tracked product.
 All timestamps are returned as UTC ISO-8601 strings.
 

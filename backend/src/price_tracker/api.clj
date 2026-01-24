@@ -138,25 +138,6 @@
                       :domain (:host ok)
                       :manual (:ok manual-input)}})))))
 
-(defn- preview-product-input
-  [config body]
-  (let [{:keys [url]} body]
-    (cond
-      (nil? body)
-      {:error {:type "invalid_json" :message "Request body must be JSON."}}
-
-      (str/blank? url)
-      {:error {:type "validation_error" :message "URL is required."}}
-
-      :else
-      (let [{:keys [ok error]} (fetch/validate-url config url)
-            normalized (fetch/normalize-url url)]
-        (cond
-          error {:error error}
-          (nil? normalized) {:error {:type "validation_error" :message "Invalid URL."}}
-          :else {:ok {:url normalized
-                      :host (:host ok)}})))))
-
 (defn create-product
   [ds config]
   (fn [req]
@@ -196,25 +177,6 @@
               (if (= "23505" (sql-state e))
                 (responses/error-response 409 "already_exists" "Product already exists.")
                 (throw e)))))))))
-
-(defn preview-product
-  [config]
-  (fn [req]
-    (let [{:keys [ok error]} (preview-product-input config (:json-body req))]
-      (if error
-        (responses/error-response 422 (:type error) (:message error))
-        (let [input ok
-              {:keys [ok error]} (fetch/fetch-product-details config input)]
-          (if error
-            (fetch-error-response error)
-            (responses/json-response
-             {:url (:url input)
-              :domain (:host input)
-              :title (:title ok)
-              :price (:price ok)
-              :currency (:currency ok)
-              :parserVersion (:parser-version ok)
-              :rawPriceText (:raw-price-text ok)})))))))
 
 (defn list-products
   [ds]

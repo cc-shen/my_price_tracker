@@ -56,12 +56,11 @@
   [config ds]
   [["/health" {:get health-handler}]
    ["/api/products"
-    {:get (api/list-products ds)
-     :post (api/create-product ds config)}
-    ["/preview" {:post (api/preview-product config)}]
+    ["" {:get (api/list-products ds)
+         :post (api/create-product ds config)}]
     ["/:id"
-     {:get (api/get-product ds)
-      :delete (api/delete-product ds)}
+     ["" {:get (api/get-product ds)
+          :delete (api/delete-product ds)}]
      ["/prices" {:get (api/get-price-history ds)}]
      ["/refresh" {:post (api/refresh-product ds config)}]
      ["/fetch" {:post (api/fetch-product ds config)}]]]])
