@@ -13,6 +13,7 @@ type RefreshPriceResponse = {
 type RefreshPriceModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  initialPrice?: number | null;
   product?: {
     id: string;
     title: string;
@@ -24,11 +25,11 @@ type RefreshPriceModalProps = {
 export default function RefreshPriceModal({
   isOpen,
   onClose,
+  initialPrice,
   product,
   onRefreshed
 }: RefreshPriceModalProps) {
   const [price, setPrice] = useState("");
-  const [currency, setCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { pushToast } = useToast();
@@ -36,16 +37,24 @@ export default function RefreshPriceModal({
   useEffect(() => {
     if (!isOpen) {
       setPrice("");
-      setCurrency("");
       setError(null);
       setIsSubmitting(false);
       return;
     }
-    setPrice("");
-    setCurrency(product?.currency ?? "");
+    if (initialPrice === null || initialPrice === undefined) {
+      setPrice("");
+    } else if (Number.isFinite(initialPrice)) {
+      setPrice(initialPrice.toString());
+    } else {
+      setPrice("");
+    }
     setError(null);
     setIsSubmitting(false);
-  }, [isOpen, product?.currency, product?.id]);
+  }, [isOpen, product?.currency, product?.id, initialPrice]);
+
+  const hasPrefill = initialPrice !== null && initialPrice !== undefined;
+  const submitLabel = hasPrefill ? "Confirm price" : "Update price";
+  const submittingLabel = hasPrefill ? "Confirming..." : "Updating...";
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -58,10 +67,6 @@ export default function RefreshPriceModal({
       setError("Please enter a valid price.");
       return;
     }
-    if (currency.trim() && !/^[a-zA-Z]{3}$/.test(currency.trim())) {
-      setError("Currency must be a 3-letter code (e.g., USD).");
-      return;
-    }
 
     setIsSubmitting(true);
     setError(null);
@@ -72,8 +77,7 @@ export default function RefreshPriceModal({
         {
           method: "POST",
           body: JSON.stringify({
-            price: parsedPrice,
-            currency: currency.trim() ? currency.trim().toUpperCase() : undefined
+            price: parsedPrice
           })
         }
       );
@@ -113,16 +117,21 @@ export default function RefreshPriceModal({
           />
         </label>
         <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-          Currency (optional)
+          Currency (locked)
           <input
             type="text"
-            value={currency}
-            onChange={(event) => setCurrency(event.target.value)}
-            placeholder="USD"
+            value={product?.currency ?? ""}
+            readOnly
+            placeholder="N/A"
             maxLength={3}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+            className="w-full cursor-default rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm uppercase text-slate-500 shadow-sm outline-none"
           />
         </label>
+        {hasPrefill ? (
+          <p className="text-xs text-slate-600">
+            Fetched price pre-filled. Confirm to save.
+          </p>
+        ) : null}
         <p className="text-xs text-slate-600">
           One update per day. Submitting again today will overwrite today&apos;s
           price.
@@ -145,7 +154,7 @@ export default function RefreshPriceModal({
             disabled={isSubmitting}
             className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting ? "Updating..." : "Update price"}
+            {isSubmitting ? submittingLabel : submitLabel}
           </button>
         </div>
       </form>

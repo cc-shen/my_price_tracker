@@ -65,6 +65,46 @@
         (is (= "Manual Item" (:title body)))
         (is (== 12.50M (:price body)))))))
 
+(deftest preview-product-validation
+  (let [config {:fetch {}}
+        handler (api/preview-product config)]
+    (testing "rejects missing JSON"
+      (let [resp (handler {:json-body nil})]
+        (is (= 422 (:status resp)))
+        (is (= "invalid_json" (get-in (parse-body resp) [:error :type])))))
+
+    (testing "rejects blank URL"
+      (let [resp (handler {:json-body {:url ""}})]
+        (is (= 422 (:status resp)))
+        (is (= "validation_error" (get-in (parse-body resp) [:error :type])))))
+
+    (testing "rejects invalid URL"
+      (with-redefs [fetch/validate-url (fn [_ _] {:error {:type "validation_error" :message "Invalid URL."}})
+                    fetch/normalize-url (fn [_] nil)]
+        (let [resp (handler {:json-body {:url "not-a-url"}})]
+          (is (= 422 (:status resp)))
+          (is (= "validation_error" (get-in (parse-body resp) [:error :type]))))))))
+
+(deftest preview-product-success
+  (let [config {:fetch {}}
+        handler (api/preview-product config)]
+    (with-redefs [fetch/validate-url (fn [_ _] {:ok {:host "example.com" :uri nil}})
+                  fetch/normalize-url (fn [_] "https://example.com/item")
+                  fetch/fetch-product-details (fn [_ _]
+                                                {:ok {:title "Parsed Item"
+                                                      :price 19.99M
+                                                      :currency "USD"
+                                                      :raw-price-text "$19.99"
+                                                      :parser-version "v1"}})]
+      (let [resp (handler {:json-body {:url "https://example.com/item"}})
+            body (parse-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= "https://example.com/item" (:url body)))
+        (is (= "example.com" (:domain body)))
+        (is (= "Parsed Item" (:title body)))
+        (is (== 19.99M (:price body)))
+        (is (= "USD" (:currency body)))))))
+
 (deftest create-product-conflict
   (let [config {:fetch {}}
         handler (api/create-product nil config)]
@@ -124,6 +164,20 @@
       (is (= 404 (:status resp)))
       (is (= "not_found" (get-in (parse-body resp) [:error :type]))))))
 
+(deftest refresh-product-currency-mismatch
+  (with-redefs [store/get-product (fn [_ _] {:id "p1"
+                                             :currency "USD"})
+                store/insert-price-snapshot! (fn [& _]
+                                               (throw (ex-info "should-not-insert" {})))
+                store/update-last-checked! (fn [& _]
+                                             (throw (ex-info "should-not-update" {})))]
+    (let [handler (api/refresh-product nil {})
+          resp (handler {:path-params {:id "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+                         :json-body {:price 9.50
+                                     :currency "CAD"}})]
+      (is (= 422 (:status resp)))
+      (is (= "currency_mismatch" (get-in (parse-body resp) [:error :type]))))))
+
 (deftest fetch-product-parse-failed
   (with-redefs [store/get-product (fn [_ _] {:id "p1"
                                              :url "https://example.com/item"
@@ -135,3 +189,24 @@
           resp (handler {:path-params {:id "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}})]
       (is (= 422 (:status resp)))
       (is (= "parse_failed" (get-in (parse-body resp) [:error :type]))))))
+
+(deftest fetch-product-preview-response
+  (with-redefs [store/get-product (fn [_ _] {:id "p1"
+                                             :url "https://example.com/item"
+                                             :canonical_url "https://example.com/item"
+                                             :domain "example.com"})
+                fetch/fetch-product-details (fn [_ _] {:ok {:price 19.99M
+                                                            :currency "USD"
+                                                            :raw-price-text "$19.99"
+                                                            :parser-version "v1"}})
+                store/insert-price-snapshot! (fn [& _]
+                                               (throw (ex-info "should-not-insert" {})))
+                store/update-last-checked! (fn [& _]
+                                             (throw (ex-info "should-not-update" {})))]
+    (let [handler (api/fetch-product nil {})
+          resp (handler {:path-params {:id "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}})
+          body (parse-body resp)]
+      (is (= 200 (:status resp)))
+      (is (== 19.99M (:price body)))
+      (is (= "USD" (:currency body)))
+      (is (= "$19.99" (:rawPriceText body))))))

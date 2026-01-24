@@ -41,6 +41,54 @@ describe("AddProductModal", () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
+  it("prefills fields from fetch details", async () => {
+    const onCreated = vi.fn();
+    const onClose = vi.fn();
+    const previewPayload = {
+      url: "https://example.com/product",
+      domain: "example.com",
+      title: "Fetched Item",
+      price: 42.5,
+      currency: "CAD"
+    };
+
+    vi.mocked(apiSend).mockResolvedValueOnce(previewPayload);
+
+    render(
+      <ToastProvider>
+        <AddProductModal isOpen onClose={onClose} onCreated={onCreated} />
+      </ToastProvider>
+    );
+
+    await userEvent.type(
+      screen.getByLabelText("Product URL"),
+      "https://example.com/product?utm=1"
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Fetch details" })
+    );
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Product title") as HTMLInputElement).value
+      ).toBe("Fetched Item");
+      expect(
+        (screen.getByLabelText("Price") as HTMLInputElement).value
+      ).toBe("42.5");
+      expect(
+        (screen.getByLabelText("Currency (optional)") as HTMLInputElement).value
+      ).toBe("CAD");
+    });
+
+    expect(apiSend).toHaveBeenCalledWith(
+      "/api/product-preview",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com/product?utm=1" })
+      })
+    );
+  });
+
   it("submits a product", async () => {
     const onCreated = vi.fn();
     const onClose = vi.fn();

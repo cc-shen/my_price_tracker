@@ -59,16 +59,21 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - On submission:
   - Validate URL format
   - Normalize URL (strip tracking parameters if possible)
+  - (Optional) allow a one-off fetch to prefill title/price/currency before submission
   - Require manual metadata entry:
     - `title`
     - `price` (numeric)
     - `currency` (e.g., CAD/USD; optional)
+  - Currency is set at product creation and is immutable on subsequent price updates.
   - Store product record
   - Store initial price point in price history
 
 **Acceptance Criteria:**
 - If manual entry succeeds, product appears in the dashboard immediately.
 - If validation fails, show a helpful error (e.g., “title and price are required”).
+- Attempts to change currency after creation are rejected.
+- If fetch succeeds, the modal is pre-filled and the user must confirm to create the product.
+- If fetch fails, the user can proceed with manual entry.
 
 #### FR-2: Support multiple retailer domains
 **Requirements:**
@@ -157,27 +162,32 @@ Do not open firewall rules, port-forwarding, or public tunnels for this app.
 - Confirm deletes and removes from UI immediately after success.
 
 
-### 3.5 Data Fetching Behavior (Manual + Limited Preview)
+### 3.5 Data Fetching Behavior (Manual + Confirmed Preview)
 
 #### FR-8: Manual refresh (MVP)
 **Requirements:**
 - Provide a “Refresh price” button per product or on dashboard.
 - On refresh:
-  - user enters the latest price (and optional currency)
+  - open the price update modal (shared with fetch confirmation)
+  - user enters the latest price
+  - currency is displayed but read-only (uses the tracked product currency)
   - overwrite the existing snapshot for the same **UTC day**, or create a new one if none exists
 
 **Acceptance Criteria:**
 - Refresh overwrites today’s record in UTC (if present) and updates the timestamp.
+- Currency cannot be changed during refresh.
 
 #### FR-9: One-off fetch for tracked products (limited)
 **Requirements:**
 - Provide a “Fetch” action that attempts a one-time parse of the tracked product URL.
 - Only works for supported domains; failures should instruct manual update.
-- Uses the same same-day overwrite rule as manual refresh (UTC day).
+- On success, return a candidate price and show the price update modal with the fetched value pre-filled.
+- Price snapshots are only stored after the user confirms in the modal.
+- Uses the same same-day overwrite rule as manual refresh (UTC day) when the user confirms.
 
 **Acceptance Criteria:**
-- If parsing succeeds, the latest price is stored and the UI updates.
-- If parsing fails, the user is prompted to enter a manual update.
+- If parsing succeeds, the fetched price is shown in the modal and nothing is stored until the user confirms.
+- If parsing fails, the user is prompted to enter a manual update via the same modal.
 
 
 ## 4) Non-Functional Requirements
@@ -263,7 +273,7 @@ Recommended for persistence and efficient time-series queries.
 - `canonical_url` (text, unique, optional)
 - `domain` (text)
 - `title` (text)
-- `currency` (text) — optional
+- `currency` (text) — optional, immutable after product creation
 - `created_at` (timestamptz)
 - `updated_at` (timestamptz)
 - `last_checked_at` (timestamptz, nullable)
@@ -273,7 +283,7 @@ Recommended for persistence and efficient time-series queries.
 - `id` (uuid, pk)
 - `product_id` (uuid, fk → products.id ON DELETE CASCADE)
 - `price` (numeric(12,2))
-- `currency` (text)
+- `currency` (text) — must match the product currency
 - `checked_at` (timestamptz)
 - `checked_on` (date, UTC)
 - `source` (text, e.g., “manual-entry”, “manual-refresh”)
@@ -286,7 +296,28 @@ Recommended for persistence and efficient time-series queries.
 
 All timestamp fields in API responses must be ISO-8601 UTC strings.
 
-### 6.1 Add product
+### 6.1 Preview product details (optional)
+`POST /api/product-preview`
+```json
+{
+  "url": "https://..."
+}
+```
+
+Response (preview only, no write):
+```json
+{
+  "url": "https://...",
+  "domain": "amazon.ca",
+  "title": "Product name",
+  "price": 123.45,
+  "currency": "CAD",
+  "rawPriceText": "$123.45"
+}
+```
+The client must present the preview in the add product modal and submit `/api/products` to persist.
+
+### 6.2 Add product
 `POST /api/products`
 ```json
 {
@@ -311,7 +342,7 @@ Response:
 }
 ```
 
-### 6.2 List products
+### 6.3 List products
 `GET /api/products`
 
 Response:
@@ -328,10 +359,10 @@ Response:
 ]
 ```
 
-### 6.3 Get single product
+### 6.4 Get single product
 `GET /api/products/:id`
 
-### 6.4 Get price history (with range filters)
+### 6.5 Get price history (with range filters)
 `GET /api/products/:id/prices?from=2025-01-01&to=2026-01-20`
 
 Response:
@@ -345,19 +376,28 @@ Response:
 }
 ```
 
-### 6.5 Refresh price manually
+### 6.6 Refresh price manually
 `POST /api/products/:id/refresh`
 ```json
 {
-  "price": 120.00,
-  "currency": "CAD"
+  "price": 120.00
 }
 ```
+Currency is inferred from the tracked product. If a currency value is provided, it must match the existing product currency and does not update it.
 
-### 6.6 Fetch latest price (limited)
+### 6.7 Fetch latest price (limited)
 `POST /api/products/:id/fetch`
+Response (preview only, no write):
+```json
+{
+  "price": 120.00,
+  "currency": "CAD",
+  "rawPriceText": "$120.00"
+}
+```
+The client must present the preview in the price update modal and call `/refresh` to confirm and persist.
 
-### 6.7 Delete product
+### 6.8 Delete product
 `DELETE /api/products/:id`
 
 
@@ -421,7 +461,8 @@ Log important events:
 - Product detail view with history chart
 - Date range presets
 - Delete with confirmation
-- Manual refresh (same-day overwrite)
+- Manual refresh (same-day overwrite, currency locked)
+- Fetch preview with manual confirmation (no auto-write)
 - Dockerized deployment with Postgres
 
 **Nice-to-have (v1.1)**

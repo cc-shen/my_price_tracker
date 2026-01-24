@@ -160,8 +160,7 @@
                                             :checked-at t1})
         (let [handler (api/refresh-product *ds* {})
               resp (handler {:path-params {:id (str (:id product))}
-                             :json-body {:price 9.50
-                                         :currency "USD"}})]
+                             :json-body {:price 9.50}})]
           (is (= 200 (:status resp)))
           (is (= 2 (count-for-product "price_snapshots" (:id product)))))))))
 

@@ -55,6 +55,7 @@
 (defn routes
   [config ds]
   [["/health" {:get health-handler}]
+   ["/api/product-preview" {:post (api/preview-product config)}]
    ["/api/products"
     ["" {:get (api/list-products ds)
          :post (api/create-product ds config)}]

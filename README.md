@@ -22,7 +22,8 @@ Note: the compose file defaults the backend `DATABASE_URL` to the `db` service h
 locally (outside Docker), update `DATABASE_URL` in `.env` to use `localhost`.
 
 ## Adding products
-Use the Add Product modal and enter the URL, title, and price manually.
+Use the Add Product modal and enter the URL, title, and price manually. You can also
+use "Fetch details" to prefill fields before confirming.
 
 ## Timezones
 All timestamps are stored and returned in UTC; the UI displays times in Eastern Time (EST/EDT).

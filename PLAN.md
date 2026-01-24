@@ -107,3 +107,14 @@
 
 - Search/sort filters and improved canonical URL handling.
 - Failure tracking and retries; better domain error reporting.
+
+## Milestone 9: Price update confirmation changes
+
+- [x] Reuse the refresh modal for fetch previews and require user confirmation before persisting.
+- [x] Lock the currency field on refresh/fetch update flows (display only).
+- [x] Adjust fetch/refresh API behavior to support preview-only fetch and currency immutability.
+
+## Milestone 10: Add product preview flow
+
+- [x] Add a preview endpoint to fetch product details by URL before creation.
+- [x] Update the add product modal to fetch and prefill fields before submit.

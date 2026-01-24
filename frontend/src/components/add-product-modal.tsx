@@ -13,6 +13,17 @@ type CreateProductResponse = {
   lastCheckedAt?: string;
 };
 
+type PreviewProductResponse = {
+  url: string;
+  domain: string;
+  title?: string | null;
+  price?: number | null;
+  currency?: string | null;
+  rawPriceText?: string | null;
+  parserVersion?: string;
+  source?: string;
+};
+
 type AddProductModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -29,6 +40,8 @@ export default function AddProductModal({
   const [manualPrice, setManualPrice] = useState("");
   const [manualCurrency, setManualCurrency] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [prefillSource, setPrefillSource] = useState<string | null>(null);
+  const [isPrefilling, setIsPrefilling] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { pushToast } = useToast();
 
@@ -39,9 +52,52 @@ export default function AddProductModal({
       setManualPrice("");
       setManualCurrency("");
       setError(null);
+      setPrefillSource(null);
+      setIsPrefilling(false);
       setIsSubmitting(false);
     }
   }, [isOpen]);
+
+  const handlePrefill = async () => {
+    if (!url.trim()) {
+      setError("Please enter a product URL to fetch details.");
+      return;
+    }
+
+    setIsPrefilling(true);
+    setError(null);
+
+    try {
+      const payload = await apiSend<PreviewProductResponse>("/api/product-preview", {
+        method: "POST",
+        body: JSON.stringify({ url: url.trim() })
+      });
+      if (payload?.url) {
+        setUrl(payload.url);
+      }
+      if (payload?.title) {
+        setManualTitle(payload.title);
+      }
+      if (payload?.price !== null && payload?.price !== undefined) {
+        setManualPrice(payload.price.toString());
+      }
+      if (payload?.currency) {
+        setManualCurrency(payload.currency.toUpperCase());
+      }
+      setPrefillSource(payload?.domain ?? null);
+      pushToast({
+        message: "Fetched details. Review and confirm before adding.",
+        tone: "success"
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to fetch product details.";
+      setError(message);
+      pushToast({ message, tone: "error" });
+    } finally {
+      setIsPrefilling(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -107,14 +163,29 @@ export default function AddProductModal({
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
           Product URL
-          <input
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://..."
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://..."
+              className="w-full flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+            />
+            <button
+              type="button"
+              onClick={handlePrefill}
+              disabled={isPrefilling || isSubmitting || !url.trim()}
+              className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isPrefilling ? "Fetching..." : "Fetch details"}
+            </button>
+          </div>
         </label>
+        {prefillSource ? (
+          <p className="text-xs text-slate-600">
+            Details fetched from {prefillSource}. Review before adding.
+          </p>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
             Product title
@@ -122,7 +193,6 @@ export default function AddProductModal({
               type="text"
               value={manualTitle}
               onChange={(event) => setManualTitle(event.target.value)}
-              placeholder="Blue Light Blocking Glasses"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
             />
           </label>
@@ -132,7 +202,6 @@ export default function AddProductModal({
               type="number"
               value={manualPrice}
               onChange={(event) => setManualPrice(event.target.value)}
-              placeholder="19.99"
               step="0.01"
               min="0"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
@@ -165,7 +234,7 @@ export default function AddProductModal({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPrefilling}
             className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? "Adding..." : "Add product"}

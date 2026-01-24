@@ -27,10 +27,9 @@ type PriceHistoryResponse = {
 };
 
 type FetchPriceResponse = {
-  id: string;
   price: number;
   currency?: string;
-  lastCheckedAt?: string;
+  rawPriceText?: string;
   parserVersion?: string;
   source?: string;
 };
@@ -92,11 +91,13 @@ export default function ProductDetail() {
   const [isRefreshOpen, setIsRefreshOpen] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchBlocked, setFetchBlocked] = useState(false);
+  const [fetchPreviewPrice, setFetchPreviewPrice] = useState<number | null>(null);
   const { pushToast } = useToast();
 
   useEffect(() => {
     setFetchBlocked(false);
     setIsFetching(false);
+    setFetchPreviewPrice(null);
   }, [id]);
 
   useEffect(() => {
@@ -208,31 +209,16 @@ export default function ProductDetail() {
           method: "POST"
         }
       );
-      setProduct((prev) =>
-        prev
-          ? {
-              ...prev,
-              currency: payload.currency ?? prev.currency,
-              lastCheckedAt: payload.lastCheckedAt ?? prev.lastCheckedAt
-            }
-          : prev
-      );
-      if (payload.lastCheckedAt) {
-        setPoints((prev) =>
-          upsertPoint(prev, {
-            t: payload.lastCheckedAt,
-            price: payload.price,
-            currency: payload.currency
-          })
-        );
-      }
-      pushToast({ message: "Fetched latest price.", tone: "success" });
+      setFetchPreviewPrice(payload.price);
+      setIsRefreshOpen(true);
+      pushToast({ message: "Fetched latest price. Confirm to save.", tone: "success" });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to fetch price.";
       setError(message);
       if (err instanceof ApiError) {
         if (err.type === "parse_failed" || err.type === "domain_not_supported") {
+          setFetchPreviewPrice(null);
           setIsRefreshOpen(true);
         }
         if (err.type === "fetch_rejected") {
@@ -282,7 +268,10 @@ export default function ProductDetail() {
             </button>
             <button
               type="button"
-              onClick={() => setIsRefreshOpen(true)}
+              onClick={() => {
+                setFetchPreviewPrice(null);
+                setIsRefreshOpen(true);
+              }}
               disabled={!product}
               className="rounded-full border border-amber-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 transition hover:border-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -352,8 +341,12 @@ export default function ProductDetail() {
       <RefreshPriceModal
         isOpen={isRefreshOpen}
         product={product}
+        initialPrice={fetchPreviewPrice}
         onRefreshed={handleRefreshed}
-        onClose={() => setIsRefreshOpen(false)}
+        onClose={() => {
+          setIsRefreshOpen(false);
+          setFetchPreviewPrice(null);
+        }}
       />
     </section>
   );

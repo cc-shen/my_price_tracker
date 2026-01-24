@@ -76,7 +76,8 @@
 
         :else
         {:ok {:price price
-              :currency currency}}))))
+              :currency currency
+              :currency-provided? currency-provided?}}))))
 
 (defn- ->utc-string
   [value]
@@ -138,6 +139,25 @@
                       :domain (:host ok)
                       :manual (:ok manual-input)}})))))
 
+(defn- preview-product-input
+  [config body]
+  (let [url (:url body)]
+    (cond
+      (nil? body)
+      {:error {:type "invalid_json" :message "Request body must be JSON."}}
+
+      (str/blank? url)
+      {:error {:type "validation_error" :message "URL is required."}}
+
+      :else
+      (let [{:keys [ok error]} (fetch/validate-url config url)
+            normalized (fetch/normalize-url url)]
+        (cond
+          error {:error error}
+          (nil? normalized) {:error {:type "validation_error" :message "Invalid URL."}}
+          :else {:ok {:url normalized
+                      :domain (:host ok)}})))))
+
 (defn create-product
   [ds config]
   (fn [req]
@@ -177,6 +197,27 @@
               (if (= "23505" (sql-state e))
                 (responses/error-response 409 "already_exists" "Product already exists.")
                 (throw e)))))))))
+
+(defn preview-product
+  [config]
+  (fn [req]
+    (let [{:keys [ok error]} (preview-product-input config (:json-body req))]
+      (if error
+        (responses/error-response 422 (:type error) (:message error))
+        (let [{:keys [url domain]} ok
+              {:keys [ok error]} (fetch/fetch-product-details config {:url url
+                                                                      :host domain})]
+          (if error
+            (fetch-error-response error)
+            (responses/json-response
+             {:url url
+              :domain domain
+              :title (:title ok)
+              :price (:price ok)
+              :currency (:currency ok)
+              :rawPriceText (:raw-price-text ok)
+              :source "auto-fetch"
+              :parserVersion (:parser-version ok)})))))))
 
 (defn list-products
   [ds]
@@ -273,28 +314,12 @@
                 {:keys [ok error]} (fetch/fetch-product-details config {:url url :host host})]
             (if error
               (fetch-error-response error)
-              (with-transaction
-                ds
-                (fn [tx]
-                  (let [checked-at (Instant/now)
-                        currency (or (:currency ok) (:currency product))
-                        snapshot (store/insert-price-snapshot! tx
-                                                               {:product-id (:id product)
-                                                                :price (:price ok)
-                                                                :currency currency
-                                                                :source "auto-fetch"
-                                                                :raw-price-text (:raw-price-text ok)
-                                                                :parser-version (:parser-version ok)
-                                                                :checked-at checked-at})]
-                    (store/update-last-checked! tx {:product-id (:id product)
-                                                    :checked-at checked-at})
-                    (responses/json-response
-                     {:id (:id product)
-                      :price (:price snapshot)
-                      :currency (:currency snapshot)
-                      :lastCheckedAt (->utc-string (:checked_at snapshot))
-                      :source "auto-fetch"
-                      :parserVersion (:parser-version ok)}))))))
+              (responses/json-response
+               {:price (:price ok)
+                :currency (:currency ok)
+                :rawPriceText (:raw-price-text ok)
+                :source "auto-fetch"
+                :parserVersion (:parser-version ok)})))
           (responses/error-response 404 "not_found" "Product not found."))))))
 
 (defn refresh-product
@@ -310,23 +335,27 @@
           (let [{:keys [ok error]} (parse-refresh-input (:json-body req))]
             (if error
               (responses/error-response 422 (:type error) (:message error))
-              (with-transaction
-                ds
-                (fn [tx]
-                  (let [checked-at (Instant/now)
-                        currency (or (:currency ok) (:currency product))
-                        snapshot (store/insert-price-snapshot! tx
-                                                               {:product-id (:id product)
-                                                                :price (:price ok)
-                                                                :currency currency
-                                                                :source "manual-refresh"
-                                                                :parser-version "manual-v1"
-                                                                :checked-at checked-at})]
-                    (store/update-last-checked! tx {:product-id (:id product)
-                                                    :checked-at checked-at})
-                    (responses/json-response
-                     {:id (:id product)
-                      :price (:price snapshot)
-                      :currency (:currency snapshot)
-                      :lastCheckedAt (->utc-string (:checked_at snapshot))}))))))
+              (let [{:keys [currency currency-provided? price]} ok
+                    product-currency (:currency product)]
+                (if (and currency-provided? (not= currency product-currency))
+                  (responses/error-response 422 "currency_mismatch"
+                                            "Currency cannot be changed once set.")
+                  (with-transaction
+                    ds
+                    (fn [tx]
+                      (let [checked-at (Instant/now)
+                            snapshot (store/insert-price-snapshot! tx
+                                                                   {:product-id (:id product)
+                                                                    :price price
+                                                                    :currency product-currency
+                                                                    :source "manual-refresh"
+                                                                    :parser-version "manual-v1"
+                                                                    :checked-at checked-at})]
+                        (store/update-last-checked! tx {:product-id (:id product)
+                                                        :checked-at checked-at})
+                        (responses/json-response
+                         {:id (:id product)
+                          :price (:price snapshot)
+                          :currency (:currency snapshot)
+                          :lastCheckedAt (->utc-string (:checked_at snapshot))}))))))))
           (responses/error-response 404 "not_found" "Product not found."))))))

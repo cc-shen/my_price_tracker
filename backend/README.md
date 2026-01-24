@@ -30,8 +30,10 @@ DATABASE_URL=jdbc:postgresql://postgres:postgres@localhost:5432/price_tracker \
 ```
 
 ## API notes
+`POST /api/product-preview` fetches a one-off preview for add-product; clients must confirm via `/api/products` before persisting.
 `POST /api/products` requires a manual payload with `title` and `price`.
-`POST /api/products/:id/fetch` attempts a one-off price fetch for a tracked product.
+`POST /api/products/:id/fetch` returns a preview price for a tracked product; clients must confirm via `/refresh` before persisting.
+`POST /api/products/:id/refresh` uses the tracked currency (currency changes are not allowed).
 All timestamps are returned as UTC ISO-8601 strings.
 
 ## Tests
